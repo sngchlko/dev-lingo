@@ -18,6 +18,10 @@ RESULT = {"explanation_label": "해설", "sentences": [{"english": "Could you ta
 
 
 class WindowsStreamTests(unittest.TestCase):
+    def test_windows_session_start_needs_no_python_or_translation(self):
+        self.assertEqual(lingo_process.windows_hook_command("prepare"), "exit 0")
+        self.assertIn("dev_lingo.py", lingo_process.windows_hook_command("hook"))
+
     def run_fixture(self, body, timeout=2, payload=None):
         with tempfile.TemporaryDirectory(prefix="dev lingo 한글 ") as directory:
             fixture = Path(directory) / "fixture.py"

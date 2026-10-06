@@ -154,7 +154,7 @@ Set `enabled = true` to re-enable it. To disable it for a specific trusted proje
 On macOS/Linux, unused preparation processes stop after two minutes without a translation. To stop an idle preparation worker immediately, run the installed script with `stop`:
 
 ```sh
-python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.1/scripts/dev_lingo.py stop
+python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.2/scripts/dev_lingo.py stop
 ```
 
 An active translation finishes normally. Disabling or removing the plugin prevents new hook invocations; any unused preparation worker expires on the same idle limit.
@@ -215,7 +215,7 @@ On macOS/Linux, preparation follows Pocket Lingo's approach of creating an empty
 
 The preparation worker occupies memory while it is idle. Repeated preparation requests check the worker lock before launching another process. A background waiter reaps every launched worker, and translation cleanup waits for the Codex process and terminates remaining members of its private process group.
 
-On Windows, translation uses the independent `codex exec` path. Reader and writer threads handle UTF-8 pipes under one absolute deadline. A private Windows Job Object owns the process tree and kills remaining child processes when closed or when the hook process exits. Windows hooks use `commandWindows` with a Python bootstrap that reads `PLUGIN_ROOT` directly, avoiding shell-specific environment-variable expansion.
+On Windows, translation uses the independent `codex exec` path. Reader and writer threads handle UTF-8 pipes under one absolute deadline. A private Windows Job Object owns the process tree and kills remaining child processes when closed or when the hook process exits. Windows `SessionStart` exits immediately without starting Python. The translation hook uses `commandWindows` with a Python bootstrap that reads `PLUGIN_ROOT` directly, avoiding shell-specific environment-variable expansion.
 
 ### Context isolation
 
@@ -248,6 +248,7 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 | No notification after installation | CLI authentication, plugin activation, hook trust, and app restart. |
 | Output seems hidden | Expand the hook entry and confirm you are in a local conversation. |
 | Only some prompts are skipped | Input size, usage limits, and errors from the direct translation command. |
+| Windows `SessionStart` times out after 5 seconds | Update to 0.1.2 or later, trust the changed hooks with `/hooks`, then completely quit and reopen the app. The Windows start hook now exits without launching Python. |
 | A pause before the task starts | Expected behavior of the synchronous translation hook. |
 
 Check installation and authentication:

@@ -11,6 +11,10 @@ def is_windows():
 
 
 def windows_hook_command(action):
+    if action == "prepare":
+        # Windows has no preparation worker. Do not start Python at all:
+        # interpreter startup/scanning can exceed SessionStart's 5s budget.
+        return "exit 0"
     bootstrap = ("import os,runpy,sys;"
                  "sys.path.insert(0,os.path.join(os.environ['PLUGIN_ROOT'],'scripts'));"
                  "runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','dev_lingo.py'),run_name='__main__')")

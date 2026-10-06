@@ -1,6 +1,6 @@
 {
   "name": "dev-lingo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "See clear engineering English for your prompts inside Codex, using an isolated translation run and native hook notifications.",
   "hooks": "./hooks/hooks.json",
   "interface": {

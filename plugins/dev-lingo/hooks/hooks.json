@@ -8,7 +8,7 @@
             "type": "command",
             "command": "python3 \"${PLUGIN_ROOT}/scripts/dev_lingo.py\" prepare --host codex",
             "timeout": 5,
-            "commandWindows": "python -X utf8 -c \"import os,runpy,sys;sys.path.insert(0,os.path.join(os.environ['PLUGIN_ROOT'],'scripts'));runpy.run_path(os.path.join(os.environ['PLUGIN_ROOT'],'scripts','dev_lingo.py'),run_name='__main__')\" prepare --host codex"
+            "commandWindows": "exit 0"
           }
         ]
       }
