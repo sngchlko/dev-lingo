@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from codex_rpc import Client
+from lingo_process import find_codex
 
 
 SENTINEL = "DEV_LINGO_UI_ONLY_82d1a730"
@@ -46,10 +47,10 @@ def check(app_server=False):
             marker = root / "hook-executed"
             fixture = root / "ui_only_hook.py"
             fixture.write_text("import json\nfrom pathlib import Path\nPath(%r).write_text('executed')\nprint(json.dumps({'systemMessage': %r}))\n" % (str(marker), SENTINEL))
-            command = "python3 " + shlex.quote(str(fixture))
+            command = subprocess.list2cmdline([sys.executable, str(fixture)]) if os.name == "nt" else "python3 " + shlex.quote(str(fixture))
             handler = "{type=\"command\",command=" + json.dumps(command) + "}"
             provider = '{name="Local capture",base_url="http://127.0.0.1:%s/v1",wire_api="responses",supports_websockets=false,requires_openai_auth=false}' % server.server_port
-            cli = ["codex", "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
+            cli = [find_codex(), "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
                    "--sandbox", "read-only", "--json", "--cd", str(root), "--dangerously-bypass-hook-trust",
                    "-c", "model_provider=\"dev_lingo_capture\"", "-c", "model=\"capture-model\"",
                    "-c", "model_providers.dev_lingo_capture=" + provider,
@@ -70,8 +71,15 @@ def check(app_server=False):
                     {"english": "Thanks!", "explanation": ""}]}
                 fake_codex.write_text("#!" + sys.executable + "\nimport json,sys\nfrom pathlib import Path\nsys.stdin.read()\nPath(%r).write_text('executed')\nprint(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps(%r)}}),flush=True)\nprint(json.dumps({'type':'turn.completed'}),flush=True)\n" % (str(marker), fake_result))
                 fake_codex.chmod(0o700)
+                if os.name == "nt":
+                    fake_codex = root / "fake-codex.exe"
+                    compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+                    source = root / "fixture.cs"
+                    message = json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(fake_result, ensure_ascii=False)}}, ensure_ascii=False)
+                    source.write_text('using System;using System.IO;using System.Text;class Fixture{static void Main(){Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);Console.In.ReadToEnd();File.WriteAllText(%s,"executed");Console.WriteLine(%s);Console.WriteLine("{\\\"type\\\":\\\"turn.completed\\\"}");}}' % (json.dumps(str(marker)), json.dumps(message)), encoding="utf-8")
+                    subprocess.run([str(compiler), "/nologo", "/out:" + str(fake_codex), str(source)], check=True, capture_output=True)
                 env = dict(os.environ, DEV_LINGO_CODEX=str(fake_codex), DEV_LINGO_PREWARM="0")
-                client = Client(["codex", "app-server"] + options, env=env)
+                client = Client([find_codex(), "app-server"] + options, env=env)
                 try:
                     listed = client.call("hooks/list", {"cwds": [str(root)]})
                     fixture_hooks = [hook for entry in listed["data"] for hook in entry["hooks"] if hook.get("pluginId") == "dev-lingo@dev-lingo-local"]

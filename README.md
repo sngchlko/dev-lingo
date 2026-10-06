@@ -29,9 +29,9 @@ Each explanation belongs to a final English sentence. Sentences without a useful
 
 ## Requirements
 
-- A local Codex environment on macOS or Linux.
+- A local Codex environment on macOS, Linux, or Windows 10/11.
 - Codex CLI installed and signed in. Tested with version `0.160.1`.
-- Python `3.9` or later. No additional Python packages required.
+- Python `3.9` or later. No additional Python packages required. On Windows, `python` must work in PowerShell and in the app’s environment; a Microsoft Store alias alone is insufficient.
 - Git available in the terminal for GitHub installation.
 
 Check your environment before installing:
@@ -46,11 +46,11 @@ If authentication is needed, run `codex login`.
 
 ## Installation
 
-**Supported platforms: macOS and Linux only. Dev Lingo does not currently run in native Windows or Windows PowerShell.** The commands below do not add Windows support.
+**Supported platforms: macOS, Linux, and native Windows.** Windows uses an independent translation process for every prompt; preparation is available on macOS and Linux.
 
 Run these commands in your computer's **terminal**, rather than the Codex chat input. Git, Python, and the standalone Codex CLI must be available there; installing the desktop app alone does not establish these prerequisites.
 
-### From GitHub (recommended)
+### From GitHub on macOS/Linux (recommended)
 
 Download the source so the installer can verify the installed plugin, then install from the GitHub marketplace and trust its matching hooks:
 
@@ -60,11 +60,33 @@ cd dev-lingo
 python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
-The installer registers the GitHub marketplace, installs Dev Lingo, and checks that the installed code and hook definitions match this checkout before trusting the two hooks. It also works when you have already run the marketplace commands below. If you already have the checkout, run `git pull --ff-only` instead of cloning again.
+The installer registers or refreshes the GitHub marketplace, installs Dev Lingo, and checks that the installed code and hook definitions match this checkout before trusting the two hooks. It also works when you have already run the marketplace commands below. If you already have the checkout, run `git pull --ff-only` instead of cloning again.
 
 A successful installation reports `installed: true`, `enabled: true`, `hook_trust: trusted`, and `hook_count: 2`. Completely quit and reopen the Codex app, then start a new local chat.
 
 You can review the [hook definition](plugins/dev-lingo/hooks/hooks.json) and [execution code](plugins/dev-lingo/scripts/) before installing. To review trust interactively, use the manual steps below.
+
+### From GitHub on Windows (PowerShell)
+
+Install Git, Python 3.9 or later, and the standalone Codex CLI first. Confirm that the real Python interpreter and Codex authentication work:
+
+```powershell
+python --version
+codex --version
+codex login status
+```
+
+If needed, sign in with `codex login`. Then install:
+
+```powershell
+git clone https://github.com/sngchlko/dev-lingo.git
+cd dev-lingo
+python scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+```
+
+Already downloaded it? Run `git pull --ff-only` in that folder before running the installer. Completely quit and reopen the Codex app, then start a new local chat. Windows hook definitions have changed, so existing installs also need their trust refreshed.
+
+The installer and translator resolve an npm `codex.cmd` shim to its packaged native `codex.exe`, so JSON configuration arguments do not pass through shell parsing. If discovery fails, set `$env:DEV_LINGO_CODEX` to the absolute `codex.exe` path. For app hooks, the setting must also reach the desktop app environment.
 
 ### Manual marketplace installation
 
@@ -92,7 +114,7 @@ This registers the checkout as a local marketplace. If `dev-lingo-local` is alre
 
 Submit a prompt in a local Codex conversation. The `UserPromptSubmit` hook displays the English rewrite and explanations, then Codex handles your original request. No extra command or learning mode is needed.
 
-When a conversation starts, the `SessionStart` hook prepares one empty translation process in the background. If it is ready when you submit a prompt, Dev Lingo uses it once and closes it, then prepares another empty process. Preparation sends no user prompt and generates no model response. If preparation is unavailable or busy, translation uses a fresh independent run.
+On macOS/Linux, when a conversation starts, the `SessionStart` hook prepares one empty translation process in the background. If it is ready when you submit a prompt, Dev Lingo uses it once and closes it, then prepares another empty process. Preparation sends no user prompt and generates no model response. If preparation is unavailable or busy, translation uses a fresh independent run.
 
 - **English output:** prompts in other languages are rewritten in English; English prompts are polished for wording and grammar.
 - **Explanations in your language:** the coach detects the main language of your prose, ignoring code and technical identifiers. Mixed or very short inputs may be detected incorrectly.
@@ -118,7 +140,7 @@ The command returns JSON containing the English sentences and their explanations
 | `DEV_LINGO_CODEX` | Path to the Codex CLI executable. Otherwise, Dev Lingo searches PATH and common macOS installation locations. |
 | `DEV_LINGO_MODEL` | Model to use for the separate translation run. |
 | `DEV_LINGO_COACH_FILE` | Absolute path to a custom coaching instruction file. |
-| `DEV_LINGO_PREWARM` | Set to `0` to disable preparation and start an independent run for each prompt. Preparation is enabled by default. |
+| `DEV_LINGO_PREWARM` | On macOS/Linux, set to `0` to disable preparation. Windows always uses an independent run, regardless of this variable. |
 
 These variables must reach the app and its hook process. An app that is already running may not receive variables set later in a terminal.
 
@@ -132,7 +154,7 @@ The translation model is independent of the model selected in your working conve
 
 Run `codex`, open `/plugins`, select the installed Dev Lingo plugin under `dev-lingo-local`, and press `Space` to toggle it.
 
-You can also change its entry in your user configuration, normally `~/.codex/config.toml`:
+You can also change its entry in your user configuration, normally `~/.codex/config.toml` (Windows: `$env:USERPROFILE\.codex\config.toml`):
 
 ```toml
 [plugins."dev-lingo@dev-lingo-local"]
@@ -141,10 +163,10 @@ enabled = false
 
 Set `enabled = true` to re-enable it. To disable it for a specific trusted project, use the same entry in that project's `.codex/config.toml`. Project configuration takes precedence over user configuration. Reopen the app after changing the setting.
 
-Unused preparation processes stop after two minutes without a translation. To stop an idle preparation worker immediately, run the installed script with `stop`:
+On macOS/Linux, unused preparation processes stop after two minutes without a translation. To stop an idle preparation worker immediately, run the installed script with `stop`:
 
 ```sh
-python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.0/scripts/dev_lingo.py stop
+python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.1/scripts/dev_lingo.py stop
 ```
 
 An active translation finishes normally. Disabling or removing the plugin prevents new hook invocations; any unused preparation worker expires on the same idle limit.
@@ -201,9 +223,11 @@ flowchart TD
 
 The hook runs synchronously, so translation adds a delay before the original task starts. Dev Lingo reads the translation event stream and returns the notification once `turn.completed` confirms completion, without waiting for the CLI's remaining shutdown work.
 
-Preparation follows Pocket Lingo's approach of creating an empty thread before input arrives. A local worker holds one unused Codex process and accepts requests through a Unix socket in a user-private temporary directory. Each process handles at most one translation and is then terminated. The worker expires after two minutes without a translation. First requests and requests without enough preparation time may see little benefit.
+On macOS/Linux, preparation follows Pocket Lingo's approach of creating an empty thread before input arrives. A local worker holds one unused Codex process and accepts requests through a Unix socket in a user-private temporary directory. Each process handles at most one translation and is then terminated. The worker expires after two minutes without a translation. First requests and requests without enough preparation time may see little benefit.
 
 The preparation worker occupies memory while it is idle. Repeated preparation requests check the worker lock before launching another process. A background waiter reaps every launched worker, and translation cleanup waits for the Codex process and terminates remaining members of its private process group.
+
+On Windows, translation uses the independent `codex exec` path. Reader and writer threads handle UTF-8 pipes under one absolute deadline. A private Windows Job Object owns the process tree and kills remaining child processes when closed or when the hook process exits. Windows hooks use `commandWindows` with a Python bootstrap that reads `PLUGIN_ROOT` directly, avoiding shell-specific environment-variable expansion.
 
 ### Context isolation
 
@@ -223,7 +247,7 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 
 ## Limits and troubleshooting
 
-- Only local Codex on macOS and Linux is currently supported. Windows, cloud conversations, and other coding agents are outside the current support scope.
+- Only local Codex on macOS, Linux, and Windows is currently supported. Cloud conversations and other coding agents are outside the current support scope.
 - Each translation consumes Codex usage and delays the original task.
 - Independent translation has a 45-second timeout; prepared translation has a 40-second timeout; the hook has a 55-second timeout. On errors, authentication failures, usage limits, or timeouts, the hook skips the notification and lets the original task proceed. Once a prepared run may have received the prompt, Dev Lingo does not retry automatically with another model call.
 - Empty prompts, prompts longer than 16,000 characters, and hook payloads larger than 64 KiB are skipped.
@@ -231,7 +255,7 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 | Symptom | What to check |
 | --- | --- |
 | `already added from a different source` | Use `--marketplace sngchlko/dev-lingo` for an existing GitHub registration, or explicitly remove the old marketplace registration before switching sources. |
-| Windows / PowerShell installation or hook failure | Native Windows is currently unsupported. An OS error from `plugin add` needs its complete message and error number to diagnose separately. |
+| Windows / PowerShell installation or hook failure | Use the Windows installer above; confirm `python` works and refresh hook trust. Native CLI OS errors still need their complete message and number. |
 | Codex executable cannot be found | CLI installation, PATH, or `DEV_LINGO_CODEX`. |
 | No notification after installation | CLI authentication, plugin activation, hook trust, and app restart. |
 | Output seems hidden | Expand the hook entry and confirm you are in a local conversation. |
@@ -255,6 +279,8 @@ python3 tests/check_context_isolation.py
 python3 tests/check_prepared_isolation.py
 python3 tests/check_lifecycle.py
 ```
+
+The GitHub Actions compatibility workflow runs native Windows (Python 3.9 and 3.12), macOS, and Linux tests, including GitHub installation, hook trust, UI notifications, and context isolation without external inference. Windows tests also check UTF-8 input, blocked pipes, timeouts, and descendant process cleanup. Unix preparation tests run only on macOS/Linux. On Windows, use `python` instead of `python3` for the development commands below.
 
 Unit tests cover host routing, sentence explanations, result validation, error handling, execution isolation, stream completion, timeouts, and process cleanup. The integration test requires an installed, trusted Dev Lingo plugin. It captures requests through a local provider that deliberately rejects them, without calling an external model. Any test-hook trust bypass applies only to that test run.
 

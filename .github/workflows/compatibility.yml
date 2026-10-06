@@ -1,0 +1,66 @@
+name: Platform compatibility
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python: '3.9'
+          - os: windows-latest
+            python: '3.12'
+          - os: macos-latest
+            python: '3.12'
+          - os: ubuntu-latest
+            python: '3.12'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: '1'
+      DEV_LINGO_PREWARM: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated configuration
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          home = Path(os.environ['RUNNER_TEMP']) / 'dev-lingo-codex'
+          home.mkdir(parents=True, exist_ok=True)
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
+              output.write('CODEX_HOME=' + str(home) + '\n')
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex@0.160.1
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Install and trust checkout
+        run: python scripts/install.py --trust-hook
+      - name: Native hook execution and context isolation (no inference)
+        run: python tests/check_context_isolation.py
+      - name: Register and install from GitHub
+        shell: python
+        run: |
+          import os, subprocess, sys, json
+          from pathlib import Path
+          sys.path.insert(0, str(Path('plugins/dev-lingo/scripts').resolve()))
+          from lingo_process import find_codex
+          os.environ['CODEX_HOME'] += '-github'
+          Path(os.environ['CODEX_HOME']).mkdir(parents=True, exist_ok=True)
+          registered = subprocess.run([find_codex(), 'plugin', 'marketplace', 'add', 'sngchlko/dev-lingo', '--json'], check=True, text=True, encoding='utf-8', capture_output=True)
+          root = json.loads(registered.stdout)['installedRoot']
+          # Reproduce a marketplace cached before Windows support existed.
+          subprocess.run(['git', 'reset', '--hard', 'a1a75311a39bd8d5313df6fd44b58fb7e85cc642'], cwd=root, check=True)
+          subprocess.run(['python', 'scripts/install.py', '--marketplace', 'sngchlko/dev-lingo', '--trust-hook'], check=True)
+          subprocess.run(['python', 'tests/check_context_isolation.py'], check=True)

@@ -14,6 +14,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
+if os.name == "nt":
+    raise unittest.SkipTest("Unix preparation; Windows uses isolated exec")
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "plugins/dev-lingo/scripts"))
 import codex_prepared
@@ -245,9 +248,11 @@ class WorkerLifecycleTests(unittest.TestCase):
         self.threads.append(thread)
         thread.start()
         deadline = time.monotonic() + 2
-        while not (self.directory / "worker.sock").exists() and thread.is_alive():
+        while thread.is_alive():
+            if (self.directory / "worker.sock").exists() and prewarm.request({"action": "status"}) == {"prepared": True}:
+                break
             if time.monotonic() > deadline:
-                self.fail("Worker did not bind its local socket")
+                self.fail("Worker did not become ready on its local socket")
             time.sleep(0.005)
         return thread
 

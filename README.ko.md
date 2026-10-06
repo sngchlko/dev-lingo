@@ -29,9 +29,9 @@ Dev Lingo가 훅 알림을 표시합니다.
 
 ## 요구사항
 
-- macOS 또는 Linux의 로컬 Codex 환경
+- macOS, Linux 또는 Windows 10/11의 로컬 Codex 환경
 - 설치 및 로그인된 Codex CLI — 검증 버전: `0.160.1`
-- Python `3.9` 이상 — 추가 Python 패키지 불필요
+- Python `3.9` 이상 — 추가 Python 패키지 불필요. Windows에서는 PowerShell과 앱 환경에서 실제 `python` 인터프리터를 실행할 수 있어야 합니다. Microsoft Store 실행 별칭만으로는 충분하지 않습니다.
 - GitHub 설치 시 터미널에서 실행 가능한 Git
 
 설치 전에 환경을 확인합니다.
@@ -46,11 +46,11 @@ codex login status
 
 ## 설치
 
-**현재 macOS와 Linux만 지원합니다. Windows 네이티브 환경과 Windows PowerShell에서는 Dev Lingo를 사용할 수 없습니다.** 아래 설치 명령으로 Windows 지원이 추가되지는 않습니다.
+**macOS, Linux, Windows 네이티브 환경을 지원합니다.** Windows는 프롬프트마다 독립 번역 프로세스를 실행합니다. 사전 준비는 macOS/Linux에서 제공합니다.
 
 명령은 Codex 대화 입력창이 아닌 컴퓨터의 **터미널**에서 실행합니다. Git, Python, 별도 Codex CLI가 필요합니다. 데스크톱 앱 설치만으로 이 요구사항이 갖춰지는 것은 아닙니다.
 
-### GitHub에서 설치 (권장)
+### macOS/Linux에서 GitHub 설치 (권장)
 
 설치 파일을 검증할 수 있도록 소스를 내려받고, GitHub 마켓플레이스에서 설치한 뒤 일치하는 훅을 신뢰하도록 설정합니다.
 
@@ -60,11 +60,33 @@ cd dev-lingo
 python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
-설치 스크립트는 GitHub 마켓플레이스를 등록하고 Dev Lingo를 설치합니다. 설치된 코드와 훅 정의가 내려받은 소스와 일치하는지 확인한 뒤 두 훅의 신뢰 설정을 완료합니다. 아래 마켓플레이스 명령으로 이미 설치한 경우에도 사용할 수 있습니다. 이미 소스를 내려받았다면 다시 복제하지 않고 해당 폴더에서 `git pull --ff-only`로 갱신합니다.
+설치 스크립트는 GitHub 마켓플레이스를 등록하거나 기존 등록의 캐시를 갱신한 뒤 Dev Lingo를 설치합니다. 설치된 코드와 훅 정의가 내려받은 소스와 일치하는지 확인한 뒤 두 훅의 신뢰 설정을 완료합니다. 아래 마켓플레이스 명령으로 이미 설치한 경우에도 사용할 수 있습니다. 이미 소스를 내려받았다면 다시 복제하지 않고 해당 폴더에서 `git pull --ff-only`로 갱신합니다.
 
 성공하면 `installed: true`, `enabled: true`, `hook_trust: trusted`, `hook_count: 2`가 표시됩니다. Codex 앱을 완전히 종료한 뒤 다시 열고, 새 로컬 대화에서 사용합니다.
 
 설치 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다. 신뢰 설정을 직접 검토하려면 아래 수동 설치 절차를 사용합니다.
+
+### Windows에서 GitHub 설치 (PowerShell)
+
+Git, Python 3.9 이상, 별도 Codex CLI를 먼저 설치합니다. 실제 Python 인터프리터와 Codex 인증 상태를 확인합니다.
+
+```powershell
+python --version
+codex --version
+codex login status
+```
+
+로그인이 필요하면 `codex login`을 실행합니다. 이어서 설치합니다.
+
+```powershell
+git clone https://github.com/sngchlko/dev-lingo.git
+cd dev-lingo
+python scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+```
+
+이미 내려받았다면 해당 폴더에서 `git pull --ff-only`로 갱신한 뒤 설치 스크립트를 실행합니다. Codex 앱을 완전히 종료하고 다시 열어 새 로컬 대화에서 사용합니다. Windows 훅 정의가 추가되어 기존 설치도 신뢰 설정을 갱신해야 합니다.
+
+설치 스크립트와 번역기는 npm의 `codex.cmd` 대신 패키지에 포함된 네이티브 `codex.exe`를 찾아 실행합니다. JSON 설정 인수가 셸 파싱을 거치지 않도록 하기 위한 처리입니다. 찾지 못한다면 `$env:DEV_LINGO_CODEX`에 `codex.exe`의 절대 경로를 지정합니다. 앱 훅에서도 사용하려면 해당 설정이 데스크톱 앱 환경에도 전달되어야 합니다.
 
 ### 마켓플레이스 명령으로 수동 설치
 
@@ -92,7 +114,7 @@ python3 scripts/install.py --trust-hook
 
 로컬 Codex 대화에 프롬프트를 입력합니다. `UserPromptSubmit` 훅이 영어 문장과 해설을 표시한 뒤 Codex가 원래 요청을 처리합니다. 별도 명령이나 학습 모드 전환은 필요하지 않습니다.
 
-대화가 시작되면 `SessionStart` 훅이 빈 번역 프로세스 하나를 백그라운드에서 준비합니다. 프롬프트를 제출할 때 준비가 완료되어 있으면 해당 프로세스를 한 번 사용하고 종료한 뒤, 다음 빈 프로세스를 준비합니다. 준비 단계에서는 사용자 프롬프트를 보내거나 모델 응답을 생성하지 않습니다. 준비된 프로세스가 없거나 사용 중이면 새 독립 실행으로 번역합니다.
+macOS/Linux에서는 대화가 시작되면 `SessionStart` 훅이 빈 번역 프로세스 하나를 백그라운드에서 준비합니다. 프롬프트를 제출할 때 준비가 완료되어 있으면 해당 프로세스를 한 번 사용하고 종료한 뒤, 다음 빈 프로세스를 준비합니다. 준비 단계에서는 사용자 프롬프트를 보내거나 모델 응답을 생성하지 않습니다. 준비된 프로세스가 없거나 사용 중이면 새 독립 실행으로 번역합니다.
 
 - **영어 출력:** 다른 언어의 프롬프트는 영어로 옮기고, 영어 프롬프트는 표현과 문법을 다듬습니다.
 - **입력 언어로 해설:** 코드와 기술 식별자를 제외한 본문의 주된 언어를 감지합니다. 언어가 섞이거나 입력이 매우 짧으면 감지가 부정확할 수 있습니다.
@@ -118,7 +140,7 @@ python3 plugins/dev-lingo/scripts/dev_lingo.py translate \
 | `DEV_LINGO_CODEX` | Codex CLI 실행 파일 경로. 지정하지 않으면 PATH와 일반적인 macOS 설치 경로에서 탐색합니다. |
 | `DEV_LINGO_MODEL` | 별도 번역 실행에 사용할 모델 |
 | `DEV_LINGO_COACH_FILE` | 사용자 지정 코치 지침 파일의 절대 경로 |
-| `DEV_LINGO_PREWARM` | `0`으로 설정하면 사전 준비를 끄고 프롬프트마다 독립 실행합니다. 기본은 사전 준비 활성화입니다. |
+| `DEV_LINGO_PREWARM` | macOS/Linux에서 `0`으로 설정하면 사전 준비를 끕니다. Windows에서는 이 설정과 관계없이 항상 독립 실행합니다. |
 
 환경 변수는 앱과 훅 프로세스에도 전달되어야 합니다. 이미 실행 중인 앱은 터미널에서 나중에 설정한 값을 받지 못할 수 있습니다.
 
@@ -132,7 +154,7 @@ python3 plugins/dev-lingo/scripts/dev_lingo.py translate \
 
 `codex`를 실행하고 `/plugins`를 연 뒤, `dev-lingo-local`에 설치된 Dev Lingo를 선택하고 `Space`로 활성화 상태를 전환합니다.
 
-사용자 설정 파일(기본 `~/.codex/config.toml`)의 해당 항목을 수정할 수도 있습니다.
+사용자 설정 파일(기본 `~/.codex/config.toml`, Windows는 `$env:USERPROFILE\.codex\config.toml`)의 해당 항목을 수정할 수도 있습니다.
 
 ```toml
 [plugins."dev-lingo@dev-lingo-local"]
@@ -141,10 +163,10 @@ enabled = false
 
 다시 켜려면 `enabled = true`로 변경합니다. 특정 신뢰된 프로젝트에서만 끄려면 해당 프로젝트의 `.codex/config.toml`에 같은 설정을 둡니다. 프로젝트 설정은 사용자 설정보다 우선합니다. 설정 변경 후 앱을 다시 엽니다.
 
-사용하지 않은 준비 프로세스는 번역 없이 2분이 지나면 종료됩니다. 대기 중인 준비 워커를 즉시 중지하려면 설치된 스크립트의 `stop` 명령을 실행합니다.
+macOS/Linux에서 사용하지 않은 준비 프로세스는 번역 없이 2분이 지나면 종료됩니다. 대기 중인 준비 워커를 즉시 중지하려면 설치된 스크립트의 `stop` 명령을 실행합니다.
 
 ```sh
-python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.0/scripts/dev_lingo.py stop
+python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.1/scripts/dev_lingo.py stop
 ```
 
 진행 중인 번역은 정상적으로 완료됩니다. 플러그인을 비활성화하거나 제거하면 새로운 훅 호출이 중단되며, 사용하지 않은 준비 워커는 같은 유휴 시간 제한에 따라 종료됩니다.
@@ -205,6 +227,8 @@ flowchart TD
 
 준비 워커는 대기 중에도 메모리를 사용합니다. 반복된 준비 요청은 잠금 상태를 확인해 중복 프로세스 실행을 피합니다. 실행한 워커는 백그라운드에서 종료를 기다려 회수하고, 번역 종료 시에는 Codex 프로세스의 종료를 확인한 뒤 같은 프로세스 그룹에 남은 자식도 정리합니다.
 
+Windows에서는 독립 `codex exec` 경로를 사용합니다. 읽기·쓰기 스레드가 하나의 전체 시간 제한 안에서 UTF-8 파이프를 처리합니다. 전용 Windows Job Object가 프로세스 트리를 소유하며, 번역이 종료되거나 훅 프로세스가 종료되면 남은 자식 프로세스를 정리합니다. Windows 훅은 `commandWindows`와 Python 실행 코드를 사용해 `PLUGIN_ROOT`를 직접 읽으므로 셸별 환경 변수 확장에 의존하지 않습니다.
+
 ### 컨텍스트 분리
 
 각 번역은 새 임시 디렉터리에서 아직 사용하지 않은 프로세스로 실행합니다. Dev Lingo는 작업 중인 세션을 resume/fork하거나 대화 기록을 읽거나 프로젝트 파일을 수집하지 않습니다. 번역에 전달하는 사용자 데이터는 이번 프롬프트뿐입니다. 사용한 번역 프로세스는 종료합니다.
@@ -223,7 +247,7 @@ Dev Lingo는 학습 기록 파일이나 데이터베이스를 유지하지 않�
 
 ## 제한 사항과 문제 해결
 
-- 현재 macOS와 Linux의 로컬 Codex만 지원합니다. Windows, 클라우드 대화, 다른 코딩 에이전트는 지원 범위에 포함하지 않습니다.
+- 현재 macOS/Linux/Windows의 로컬 Codex를 지원합니다. 클라우드 대화와 다른 코딩 에이전트는 지원 범위에 포함하지 않습니다.
 - 번역마다 Codex 사용량을 소비하며 원래 작업의 시작이 지연됩니다.
 - 독립 번역의 제한 시간은 45초, 준비된 번역은 40초, 훅은 55초입니다. 오류·인증 실패·사용량 제한·시간 초과 시 알림을 생략하고 원래 작업을 진행합니다. 준비된 실행이 프롬프트를 받았을 가능성이 있으면 다른 모델 호출로 자동 재시도하지 않습니다.
 - 빈 프롬프트, 16,000자를 넘는 프롬프트, 64 KiB를 넘는 훅 입력은 생략합니다.
@@ -231,7 +255,7 @@ Dev Lingo는 학습 기록 파일이나 데이터베이스를 유지하지 않�
 | 증상 | 확인 사항 |
 | --- | --- |
 | `already added from a different source` | GitHub로 등록했다면 `--marketplace sngchlko/dev-lingo`를 지정합니다. 소스를 바꾸려면 기존 마켓플레이스 등록을 먼저 제거합니다. |
-| Windows / PowerShell 설치 또는 훅 실행 실패 | Windows 네이티브 실행은 현재 지원하지 않습니다. `plugin add`의 OS 오류 원인은 전체 메시지와 오류 번호로 별도 확인해야 합니다. |
+| Windows / PowerShell 설치 또는 훅 실행 실패 | 위 Windows 설치 스크립트를 사용하고 `python` 실행 여부와 훅 신뢰 갱신을 확인합니다. 네이티브 CLI의 OS 오류는 전체 메시지와 번호로 확인해야 합니다. |
 | Codex 실행 파일을 찾지 못함 | CLI 설치, PATH, `DEV_LINGO_CODEX` |
 | 설치 후 알림이 표시되지 않음 | CLI 인증, 플러그인 활성화, 훅 신뢰 상태, 앱 재시작 |
 | 결과가 보이지 않음 | 접힌 훅 항목을 펼치고 로컬 대화인지 확인 |
@@ -246,6 +270,8 @@ codex login status
 ```
 
 ## 개발
+
+GitHub Actions에서 Windows(Python 3.9/3.12), macOS, Linux의 네이티브 테스트를 실행합니다. 외부 모델 호출 없이 GitHub 설치, 훅 신뢰 설정, UI 알림, 컨텍스트 분리를 검사합니다. Windows에서는 한글 입출력, 막힌 파이프, 시간 제한, 자식 프로세스 정리도 확인합니다. Unix 사전 준비 테스트는 macOS/Linux에서만 실행합니다. 아래 개발 명령은 Windows에서 `python3` 대신 `python`을 사용합니다.
 
 프로젝트 루트에서 실행합니다.
 

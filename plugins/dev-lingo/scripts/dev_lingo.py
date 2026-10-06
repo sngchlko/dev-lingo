@@ -9,6 +9,7 @@ from hosts import get_host
 from lingo_core import MAX_INPUT, MAX_PROMPT, MAX_SENTENCES, ROOT, coach_path, translation_environment, validate_result
 # Keep the existing Codex benchmark helpers available; host routing uses get_host.
 from codex_provider import codex_path, translation_command
+from lingo_process import is_windows
 
 
 def translate(prompt, host="codex"):
@@ -45,7 +46,7 @@ def main():
     if args.action == "hook":
         return hook(args.host)
     if args.action in {"prepare", "stop"}:
-        if args.host == "codex" and os.environ.get("DEV_LINGO_TRANSLATOR") != "1":
+        if not is_windows() and args.host == "codex" and os.environ.get("DEV_LINGO_TRANSLATOR") != "1":
             try:
                 from prewarm import warm, stop
                 warm() if args.action == "prepare" else stop()
@@ -64,6 +65,9 @@ def main():
 
 
 if __name__ == "__main__":
+    if is_windows():
+        sys.stdin.reconfigure(encoding="utf-8")
+        sys.stdout.reconfigure(encoding="utf-8")
     if len(sys.argv) > 1 and sys.argv[1] == "hook":
         try:
             sys.exit(main())

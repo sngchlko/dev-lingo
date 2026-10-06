@@ -4,11 +4,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
 from codex_rpc import Client
+from lingo_process import find_codex, windows_hook_command
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN_ID = "dev-lingo@dev-lingo-local"
@@ -19,7 +19,7 @@ def verify_installed_copy(hook):
     installed = Path(hook["sourcePath"]).resolve().parent.parent
     for name in [".codex-plugin/plugin.json", "hooks/hooks.json", "scripts/dev_lingo.py",
                  "scripts/lingo_core.py", "scripts/codex_provider.py", "scripts/codex_prepared.py",
-                 "scripts/prewarm.py", "scripts/hosts.py",
+                 "scripts/prewarm.py", "scripts/hosts.py", "scripts/lingo_process.py",
                  "prompts/coach.txt", "prompts/output.schema.json"]:
         expected = hashlib.sha256((source / name).read_bytes()).digest()
         actual = hashlib.sha256((installed / name).read_bytes()).digest()
@@ -35,6 +35,8 @@ def verify_installed_copy(hook):
         expected_command = 'python3 "${PLUGIN_ROOT}/scripts/dev_lingo.py" ' + action + ' --host codex'
         if handlers[0]["hooks"][0]["command"] != expected_command:
             raise RuntimeError("Unexpected hook command")
+        if handlers[0]["hooks"][0].get("commandWindows") != windows_hook_command(action):
+            raise RuntimeError("Unexpected Windows hook command")
 
 
 def main():
@@ -43,14 +45,15 @@ def main():
                         help="Marketplace source (default: this checkout); use sngchlko/dev-lingo for GitHub installs")
     parser.add_argument("--trust-hook", action="store_true", help="Trust only this package's matching installed hook after reviewing its source")
     args = parser.parse_args()
-    if sys.platform not in {"darwin", "linux"}:
-        parser.error("Dev Lingo currently supports macOS and Linux only. "
-                     "Native Windows / PowerShell hook execution is not supported.")
-    if not shutil.which("codex"):
-        parser.error("Codex CLI must be installed and available in PATH")
-    for command in [["codex", "plugin", "marketplace", "add", args.marketplace, "--json"],
-                    ["codex", "plugin", "add", PLUGIN_ID, "--json"]]:
-        result = subprocess.run(command, text=True, capture_output=True)
+    if sys.platform not in {"darwin", "linux", "win32"}:
+        parser.error("Dev Lingo supports macOS, Linux and Windows.")
+    try:
+        binary = find_codex()
+    except RuntimeError as error:
+        parser.error(str(error))
+    for index, command in enumerate([[binary, "plugin", "marketplace", "add", args.marketplace, "--json"],
+                    [binary, "plugin", "add", PLUGIN_ID, "--json"]]):
+        result = subprocess.run(command, text=True, encoding="utf-8", capture_output=True)
         if result.returncode:
             print(result.stderr, file=sys.stderr)
             if "already added from a different source" in result.stderr:
@@ -60,6 +63,12 @@ def main():
                       "To deliberately switch sources, remove only the marketplace registration "
                       "with: codex plugin marketplace remove dev-lingo-local", file=sys.stderr)
             return result.returncode
+        if index == 0 and json.loads(result.stdout).get("alreadyAdded") and not Path(args.marketplace).expanduser().is_dir():
+            refresh = subprocess.run([binary, "plugin", "marketplace", "upgrade", "dev-lingo-local", "--json"],
+                                     text=True, encoding="utf-8", capture_output=True)
+            if refresh.returncode or json.loads(refresh.stdout).get("errors"):
+                print(refresh.stderr or refresh.stdout, file=sys.stderr)
+                return refresh.returncode or 1
     client = Client()
     try:
         listed = client.call("hooks/list", {"cwds": [str(ROOT)]})

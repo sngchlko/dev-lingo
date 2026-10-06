@@ -19,6 +19,7 @@ def events(value=RESULT):
     return json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(value, ensure_ascii=False)}}, ensure_ascii=False) + "\n"
 
 
+@unittest.skipIf(os.name == "nt", "POSIX fixtures; Windows streams have their own tests")
 class StreamingTests(unittest.TestCase):
     def setUp(self):
         self.environment = patch.dict(os.environ, {"DEV_LINGO_PREWARM": "0"})
