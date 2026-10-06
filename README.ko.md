@@ -38,21 +38,43 @@ Dev Lingo가 훅 알림을 표시합니다.
 
 ```sh
 codex --version
-python3 --version
 codex login status
 ```
 
-인증이 필요하면 `codex login`을 실행합니다.
+Python은 macOS/Linux에서 `python3 --version`, Windows PowerShell에서 `python --version`으로 확인합니다. 인증이 필요하면 `codex login`을 실행합니다.
 
 ## 설치
 
 **macOS, Linux, Windows 네이티브 환경을 지원합니다.** Windows는 프롬프트마다 독립 번역 프로세스를 실행합니다. 사전 준비는 macOS/Linux에서 제공합니다.
 
-명령은 Codex 대화 입력창이 아닌 컴퓨터의 **터미널**에서 실행합니다. Git, Python, 별도 Codex CLI가 필요합니다. 데스크톱 앱 설치만으로 이 요구사항이 갖춰지는 것은 아닙니다.
+### Codex 플러그인으로 설치 (권장)
 
-### macOS/Linux에서 GitHub 설치 (권장)
+컴퓨터의 **터미널**에서 실행합니다. Windows는 PowerShell, macOS/Linux는 터미널을 사용하며, 세 운영체제의 설치 명령은 같습니다.
 
-설치 파일을 검증할 수 있도록 소스를 내려받고, GitHub 마켓플레이스에서 설치한 뒤 일치하는 훅을 신뢰하도록 설정합니다.
+```sh
+codex plugin marketplace add sngchlko/dev-lingo
+codex plugin add dev-lingo@dev-lingo-local
+```
+
+Codex가 플러그인을 내려받아 설치합니다. 저장소를 직접 복제하거나 Python 설치 스크립트를 실행할 필요는 없습니다. Git, Python, 별도 Codex CLI는 미리 설치되어 있어야 합니다. Python은 설치된 훅을 실행할 때 필요합니다.
+
+이 마켓플레이스를 이전에 등록했다면 [업데이트](#업데이트) 절차로 캐시를 갱신한 뒤 새 버전을 사용합니다.
+
+다음으로 **Codex CLI**를 실행합니다.
+
+```sh
+codex
+```
+
+`/hooks`를 입력하고 Dev Lingo의 `SessionStart`, `UserPromptSubmit` 두 훅을 검토한 뒤 신뢰하도록 설정합니다. 플러그인을 설치하거나 활성화하는 것만으로 훅이 자동 신뢰되지는 않습니다. [공식 훅 신뢰 안내](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)를 참고하세요.
+
+CLI를 종료한 뒤 Codex 데스크톱 앱도 완전히 종료하고 다시 열어 새 로컬 대화에서 사용합니다. Windows에서는 PowerShell뿐 아니라 앱 환경에서도 실제 `python` 인터프리터를 실행할 수 있어야 합니다.
+
+`dev-lingo-local`은 이 저장소에 정의된 마켓플레이스 식별자로, GitHub에서 설치해도 같습니다. 비공개 저장소는 설치하는 컴퓨터에 Git 접근 권한이 필요합니다.
+
+### 보조 방법: 설치 스크립트로 검증하고 설치
+
+설치 스크립트는 같은 Codex 플러그인을 설치하며, 설치된 코드가 내려받은 소스와 일치하는지 확인한 뒤 훅 신뢰 설정을 자동으로 처리합니다. 이 검증을 원하거나 설치 문제를 확인할 때 사용할 수 있습니다.
 
 ```sh
 git clone https://github.com/sngchlko/dev-lingo.git
@@ -60,45 +82,11 @@ cd dev-lingo
 python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
-설치 스크립트는 GitHub 마켓플레이스를 등록하거나 기존 등록의 캐시를 갱신한 뒤 Dev Lingo를 설치합니다. 설치된 코드와 훅 정의가 내려받은 소스와 일치하는지 확인한 뒤 두 훅의 신뢰 설정을 완료합니다. 아래 마켓플레이스 명령으로 이미 설치한 경우에도 사용할 수 있습니다. 이미 소스를 내려받았다면 다시 복제하지 않고 해당 폴더에서 `git pull --ff-only`로 갱신합니다.
+Windows PowerShell에서는 마지막 명령의 `python3`를 `python`으로 바꿉니다. 이미 내려받았다면 다시 복제하지 않고 해당 폴더에서 `git pull --ff-only`로 갱신합니다. `--trust-hook`을 사용하기 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다.
 
-성공하면 `installed: true`, `enabled: true`, `hook_trust: trusted`, `hook_count: 2`가 표시됩니다. Codex 앱을 완전히 종료한 뒤 다시 열고, 새 로컬 대화에서 사용합니다.
+스크립트는 GitHub 마켓플레이스를 등록하거나 캐시를 갱신합니다. 성공하면 `installed: true`, `enabled: true`, `hook_trust: trusted`, `hook_count: 2`가 표시됩니다. 설치 후 앱을 완전히 종료하고 다시 엽니다.
 
-설치 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다. 신뢰 설정을 직접 검토하려면 아래 수동 설치 절차를 사용합니다.
-
-### Windows에서 GitHub 설치 (PowerShell)
-
-Git, Python 3.9 이상, 별도 Codex CLI를 먼저 설치합니다. 실제 Python 인터프리터와 Codex 인증 상태를 확인합니다.
-
-```powershell
-python --version
-codex --version
-codex login status
-```
-
-로그인이 필요하면 `codex login`을 실행합니다. 이어서 설치합니다.
-
-```powershell
-git clone https://github.com/sngchlko/dev-lingo.git
-cd dev-lingo
-python scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
-```
-
-이미 내려받았다면 해당 폴더에서 `git pull --ff-only`로 갱신한 뒤 설치 스크립트를 실행합니다. Codex 앱을 완전히 종료하고 다시 열어 새 로컬 대화에서 사용합니다. Windows 훅 정의가 추가되어 기존 설치도 신뢰 설정을 갱신해야 합니다.
-
-설치 스크립트와 번역기는 npm의 `codex.cmd` 대신 패키지에 포함된 네이티브 `codex.exe`를 찾아 실행합니다. JSON 설정 인수가 셸 파싱을 거치지 않도록 하기 위한 처리입니다. 찾지 못한다면 `$env:DEV_LINGO_CODEX`에 `codex.exe`의 절대 경로를 지정합니다. 앱 훅에서도 사용하려면 해당 설정이 데스크톱 앱 환경에도 전달되어야 합니다.
-
-### 마켓플레이스 명령으로 수동 설치
-
-```sh
-codex plugin marketplace add sngchlko/dev-lingo
-codex plugin add dev-lingo@dev-lingo-local
-codex
-```
-
-열린 **Codex CLI**에서 `/hooks`를 입력합니다. Dev Lingo의 `SessionStart`, `UserPromptSubmit` 두 훅을 검토하고 신뢰하도록 설정합니다. CLI를 종료한 뒤 데스크톱 앱도 완전히 종료하고 다시 열어 새 로컬 대화를 시작합니다. 플러그인을 설치하고 활성화해도 훅은 미신뢰 상태이므로, 이 단계를 마쳐야 번역이 실행됩니다. [공식 훅 신뢰 안내](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)를 참고하세요.
-
-`dev-lingo-local`은 이 저장소에 정의된 마켓플레이스 식별자로, GitHub에서 설치해도 같습니다. 비공개 저장소는 설치하는 컴퓨터에 Git 접근 권한이 필요합니다.
+Windows에서는 설치 스크립트와 번역기가 npm의 `codex.cmd` 대신 패키지에 포함된 네이티브 `codex.exe`를 찾아 실행합니다. 찾지 못한다면 앱에서 사용하는 환경의 `DEV_LINGO_CODEX`에 `codex.exe`의 절대 경로를 지정합니다.
 
 ### 로컬 소스에서 설치
 
@@ -108,7 +96,7 @@ codex
 python3 scripts/install.py --trust-hook
 ```
 
-이 명령은 해당 폴더를 로컬 마켓플레이스로 등록합니다. `dev-lingo-local`이 이미 GitHub로 등록되어 있다면 권장 설치 명령처럼 `--marketplace sngchlko/dev-lingo`를 지정합니다. 등록 소스를 바꾸려면 먼저 `codex plugin marketplace remove dev-lingo-local`로 기존 등록을 제거하고 설치 스크립트를 다시 실행합니다. 이 명령은 등록만 제거하며 설치된 플러그인은 삭제하지 않습니다.
+Windows에서는 `python`을 사용합니다. 이 명령은 해당 폴더를 로컬 마켓플레이스로 등록합니다. `dev-lingo-local`이 이미 GitHub로 등록되어 있다면 `--marketplace sngchlko/dev-lingo`를 추가해 같은 소스를 사용합니다. 등록 소스를 바꾸려면 먼저 `codex plugin marketplace remove dev-lingo-local`로 기존 등록을 제거하고 다시 설치합니다. 이 명령은 등록만 제거하며 설치된 플러그인은 삭제하지 않습니다.
 
 ## 사용법
 
@@ -173,14 +161,14 @@ python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.1/scripts/dev_lingo
 
 ### 업데이트
 
-GitHub 마켓플레이스와 내려받은 소스를 갱신한 뒤 새 설치본을 검증하고 신뢰하도록 설정합니다.
+GitHub 마켓플레이스의 캐시를 갱신하고 플러그인을 다시 설치합니다. Windows PowerShell에서도 같은 명령을 사용합니다.
 
 ```sh
 codex plugin marketplace upgrade dev-lingo-local
-# 내려받은 dev-lingo 폴더에서 실행:
-git pull --ff-only
-python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+codex plugin add dev-lingo@dev-lingo-local
 ```
+
+`codex`를 실행하고 `/hooks`에서 변경된 Dev Lingo 훅을 검토해 신뢰하도록 설정합니다. 데스크톱 앱을 완전히 종료하고 다시 엽니다. 별도로 소스를 내려받을 필요는 없습니다.
 
 로컬 설치는 소스를 갱신한 뒤 다시 실행합니다.
 
@@ -255,7 +243,7 @@ Dev Lingo는 학습 기록 파일이나 데이터베이스를 유지하지 않�
 | 증상 | 확인 사항 |
 | --- | --- |
 | `already added from a different source` | GitHub로 등록했다면 `--marketplace sngchlko/dev-lingo`를 지정합니다. 소스를 바꾸려면 기존 마켓플레이스 등록을 먼저 제거합니다. |
-| Windows / PowerShell 설치 또는 훅 실행 실패 | 위 Windows 설치 스크립트를 사용하고 `python` 실행 여부와 훅 신뢰 갱신을 확인합니다. 네이티브 CLI의 OS 오류는 전체 메시지와 번호로 확인해야 합니다. |
+| Windows / PowerShell 설치 또는 훅 실행 실패 | `python` 실행 여부와 훅 신뢰 갱신을 확인합니다. 보조 설치 스크립트로 설치본을 검증할 수 있습니다. CLI의 OS 오류는 전체 메시지와 번호로 확인합니다. |
 | Codex 실행 파일을 찾지 못함 | CLI 설치, PATH, `DEV_LINGO_CODEX` |
 | 설치 후 알림이 표시되지 않음 | CLI 인증, 플러그인 활성화, 훅 신뢰 상태, 앱 재시작 |
 | 결과가 보이지 않음 | 접힌 훅 항목을 펼치고 로컬 대화인지 확인 |

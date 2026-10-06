@@ -38,21 +38,43 @@ Check your environment before installing:
 
 ```sh
 codex --version
-python3 --version
 codex login status
 ```
 
-If authentication is needed, run `codex login`.
+Check Python with `python3 --version` on macOS/Linux or `python --version` in Windows PowerShell. If authentication is needed, run `codex login`.
 
 ## Installation
 
 **Supported platforms: macOS, Linux, and native Windows.** Windows uses an independent translation process for every prompt; preparation is available on macOS and Linux.
 
-Run these commands in your computer's **terminal**, rather than the Codex chat input. Git, Python, and the standalone Codex CLI must be available there; installing the desktop app alone does not establish these prerequisites.
+### Install as a Codex plugin (recommended)
 
-### From GitHub on macOS/Linux (recommended)
+Run these commands in your computer's **terminal**—PowerShell on Windows, or a terminal on macOS/Linux. The commands are the same on all three platforms:
 
-Download the source so the installer can verify the installed plugin, then install from the GitHub marketplace and trust its matching hooks:
+```sh
+codex plugin marketplace add sngchlko/dev-lingo
+codex plugin add dev-lingo@dev-lingo-local
+```
+
+Codex downloads and installs the plugin. You do not need to clone the repository or run the Python installer. Git, Python, and the standalone Codex CLI must already be available; the plugin needs Python to run its hooks.
+
+If this marketplace was added before, follow [Update](#update) to refresh its cached source before using the new version.
+
+Next, launch the **Codex CLI**:
+
+```sh
+codex
+```
+
+Enter `/hooks`, review Dev Lingo's `SessionStart` and `UserPromptSubmit` hooks, and trust both. Installing or enabling the plugin alone does not trust its hooks. See the official [hook trust instructions](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
+
+Exit the CLI, completely quit and reopen the Codex desktop app, and start a new local chat. On Windows, confirm that the real `python` interpreter is available to the app as well as PowerShell.
+
+`dev-lingo-local` is the marketplace identifier defined in this repository, including when installed from GitHub. A private repository requires Git access on the installation machine.
+
+### Optional: install and verify with the helper script
+
+The helper installs the same Codex plugin and automates hook trust after verifying that the installed code matches the downloaded source. Use it if you prefer that verification or need to troubleshoot installation:
 
 ```sh
 git clone https://github.com/sngchlko/dev-lingo.git
@@ -60,55 +82,21 @@ cd dev-lingo
 python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
-The installer registers or refreshes the GitHub marketplace, installs Dev Lingo, and checks that the installed code and hook definitions match this checkout before trusting the two hooks. It also works when you have already run the marketplace commands below. If you already have the checkout, run `git pull --ff-only` instead of cloning again.
+On Windows PowerShell, use `python` instead of `python3` in the last command. If you already have the checkout, run `git pull --ff-only` instead of cloning again. You can review the [hook definition](plugins/dev-lingo/hooks/hooks.json) and [execution code](plugins/dev-lingo/scripts/) before using `--trust-hook`.
 
-A successful installation reports `installed: true`, `enabled: true`, `hook_trust: trusted`, and `hook_count: 2`. Completely quit and reopen the Codex app, then start a new local chat.
+The helper registers or refreshes the GitHub marketplace and reports `installed: true`, `enabled: true`, `hook_trust: trusted`, and `hook_count: 2` on success. Completely quit and reopen the app afterward.
 
-You can review the [hook definition](plugins/dev-lingo/hooks/hooks.json) and [execution code](plugins/dev-lingo/scripts/) before installing. To review trust interactively, use the manual steps below.
-
-### From GitHub on Windows (PowerShell)
-
-Install Git, Python 3.9 or later, and the standalone Codex CLI first. Confirm that the real Python interpreter and Codex authentication work:
-
-```powershell
-python --version
-codex --version
-codex login status
-```
-
-If needed, sign in with `codex login`. Then install:
-
-```powershell
-git clone https://github.com/sngchlko/dev-lingo.git
-cd dev-lingo
-python scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
-```
-
-Already downloaded it? Run `git pull --ff-only` in that folder before running the installer. Completely quit and reopen the Codex app, then start a new local chat. Windows hook definitions have changed, so existing installs also need their trust refreshed.
-
-The installer and translator resolve an npm `codex.cmd` shim to its packaged native `codex.exe`, so JSON configuration arguments do not pass through shell parsing. If discovery fails, set `$env:DEV_LINGO_CODEX` to the absolute `codex.exe` path. For app hooks, the setting must also reach the desktop app environment.
-
-### Manual marketplace installation
-
-```sh
-codex plugin marketplace add sngchlko/dev-lingo
-codex plugin add dev-lingo@dev-lingo-local
-codex
-```
-
-In the **Codex CLI** that opens, enter `/hooks`. Review and trust both Dev Lingo hooks: `SessionStart` and `UserPromptSubmit`. Then exit the CLI, completely quit and reopen the desktop app, and start a new local chat. Plugin installation and activation alone leave these hooks untrusted, so translation will not run until this step is complete. See the official [hook trust instructions](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
-
-`dev-lingo-local` is the marketplace identifier defined in this repository, including when installed from GitHub. A private repository requires Git access on the installation machine.
+On Windows, the helper and translator resolve an npm `codex.cmd` shim to its packaged native `codex.exe`. If discovery fails, set `DEV_LINGO_CODEX` to the absolute `codex.exe` path in the environment used by the app.
 
 ### From local source
 
-For development or a downloaded ZIP, run from the extracted project root:
+For development or a downloaded ZIP, run from the project root:
 
 ```sh
 python3 scripts/install.py --trust-hook
 ```
 
-This registers the checkout as a local marketplace. If `dev-lingo-local` is already registered from GitHub, use the recommended command with `--marketplace sngchlko/dev-lingo` instead. To deliberately switch marketplace sources, first remove the old registration with `codex plugin marketplace remove dev-lingo-local`, then rerun the installer. This removes the registration, not the installed plugin.
+Use `python` on Windows. This registers the checkout as a local marketplace. If `dev-lingo-local` is already registered from GitHub, add `--marketplace sngchlko/dev-lingo` to keep using that source. To deliberately switch sources, remove the old registration with `codex plugin marketplace remove dev-lingo-local`, then rerun the installer. This removes the registration, not the installed plugin.
 
 ## Usage
 
@@ -173,14 +161,14 @@ An active translation finishes normally. Disabling or removing the plugin preven
 
 ### Update
 
-For a GitHub marketplace installation, update the marketplace and the downloaded source, then verify and trust the new installed copy:
+For a GitHub marketplace installation, refresh the source and reinstall the plugin. These commands also work in Windows PowerShell:
 
 ```sh
 codex plugin marketplace upgrade dev-lingo-local
-# Run from your dev-lingo checkout:
-git pull --ff-only
-python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+codex plugin add dev-lingo@dev-lingo-local
 ```
+
+Open `codex`, enter `/hooks`, and review and trust any changed Dev Lingo hooks. Completely quit and reopen the desktop app. No source checkout is required.
 
 For a local installation, update the source and rerun:
 
@@ -255,7 +243,7 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 | Symptom | What to check |
 | --- | --- |
 | `already added from a different source` | Use `--marketplace sngchlko/dev-lingo` for an existing GitHub registration, or explicitly remove the old marketplace registration before switching sources. |
-| Windows / PowerShell installation or hook failure | Use the Windows installer above; confirm `python` works and refresh hook trust. Native CLI OS errors still need their complete message and number. |
+| Windows / PowerShell installation or hook failure | Confirm `python` works and refresh hook trust. The optional helper can verify installation. Native CLI OS errors need their complete message and number. |
 | Codex executable cannot be found | CLI installation, PATH, or `DEV_LINGO_CODEX`. |
 | No notification after installation | CLI authentication, plugin activation, hook trust, and app restart. |
 | Output seems hidden | Expand the hook entry and confirm you are in a local conversation. |
