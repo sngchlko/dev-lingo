@@ -1,0 +1,10 @@
+{
+  "name": "dev-lingo",
+  "version": "0.1.0",
+  "description": "See clear engineering English for your prompts inside Codex, using an isolated translation run and native hook notifications.",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Dev Lingo",
+    "shortDescription": "프롬프트로 배우는 엔지니어링 영어"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "explanation_label": {"type": "string", "description": "Localized word for Explanation in the input's dominant natural language, without a colon.", "minLength": 1, "maxLength": 48},
+    "sentences": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "properties": {
+          "english": {"type": "string", "description": "Exactly one sentence of the final English translation; never multiple sentences."},
+          "explanation": {"type": "string", "description": "One brief explanation in the input's dominant natural language, or an empty string if unnecessary."}
+        },
+        "required": ["english", "explanation"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["explanation_label", "sentences"],
+  "additionalProperties": false
+}

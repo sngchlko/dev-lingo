@@ -1,0 +1,15 @@
+{
+  "description": "Display English as a native Codex hook notification; return no model context.",
+  "hooks": {
+    "SessionStart": [{"hooks": [{
+      "type": "command",
+      "command": "python3 \"${PLUGIN_ROOT}/scripts/dev_lingo.py\" prepare --host codex",
+      "timeout": 5
+    }]}],
+    "UserPromptSubmit": [{"hooks": [{
+      "type": "command",
+      "command": "python3 \"${PLUGIN_ROOT}/scripts/dev_lingo.py\" hook --host codex",
+      "timeout": 55
+    }]}]
+  }
+}

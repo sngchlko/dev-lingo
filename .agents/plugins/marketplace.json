@@ -1,0 +1,10 @@
+{
+  "name": "dev-lingo-local",
+  "interface": {"displayName": "Dev Lingo"},
+  "plugins": [{
+    "name": "dev-lingo",
+    "source": {"source": "local", "path": "./plugins/dev-lingo"},
+    "policy": {"installation": "AVAILABLE", "authentication": "ON_USE"},
+    "category": "Productivity"
+  }]
+}

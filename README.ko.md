@@ -1,0 +1,264 @@
+# Dev Lingo
+
+[English](README.md) | 한국어
+
+Codex에 평소처럼 입력하는 프롬프트로 자연스러운 엔지니어링 영어를 배워보세요.
+
+Dev Lingo는 프롬프트를 일상적인 영어 구어체로 다듬고, 입력 언어로 짧은 문장별 해설을 제공합니다. 원래 의도와 기술적 조건을 유지하므로 영어를 쓰는 동료에게 같은 요청을 어떻게 전달할지 익힐 수 있습니다.
+
+Codex는 원래 프롬프트로 작업을 계속합니다. 번역은 별도로 실행하며, 영어 문장과 코치 지침은 작업 중인 대화 모델의 컨텍스트에 추가하지 않습니다.
+
+## 예시
+
+평소처럼 프롬프트를 입력합니다.
+
+```text
+고마워! 이 코드는 기존 동작은 유지하면서 단순하게 바꿔줘. 좋은 하루 보내!
+```
+
+Dev Lingo가 훅 알림을 표시합니다.
+
+```text
+통역: Thanks!
+통역: Could you simplify this code without changing its behavior?
+해설: 'without changing its behavior'는 코드의 기존 동작을 유지한다는 뜻이에요.
+통역: Have a great day!
+```
+
+해설은 최종 영어 문장마다 연결됩니다. 배울 만한 표현·뉘앙스·교정이 없는 문장은 해설을 생략할 수 있습니다. 실제 문구는 실행마다 달라집니다.
+
+## 요구사항
+
+- macOS 또는 Linux의 로컬 Codex 환경
+- 설치 및 로그인된 Codex CLI — 검증 버전: `0.160.1`
+- Python `3.9` 이상 — 추가 Python 패키지 불필요
+
+설치 전에 환경을 확인합니다.
+
+```sh
+codex --version
+python3 --version
+codex login status
+```
+
+인증이 필요하면 `codex login`을 실행합니다.
+
+## 설치
+
+### 로컬 소스에서 설치
+
+소스를 내려받고 프로젝트 루트에서 실행합니다.
+
+```sh
+python3 scripts/install.py --trust-hook
+```
+
+설치 스크립트는 Codex의 플러그인 명령으로 마켓플레이스를 등록하고 Dev Lingo를 설치합니다. `--trust-hook`을 사용하면 설치된 코드와 훅 정의가 원본과 일치하는지 확인한 뒤 Dev Lingo의 준비 훅과 번역 훅을 신뢰하도록 설정합니다.
+
+설치 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다. Codex의 훅 검토 화면에서 직접 신뢰 설정을 관리하려면 `--trust-hook`을 생략합니다.
+
+설치가 완료되면 `installed: true`, `enabled: true`, `hook_trust: trusted`가 표시됩니다. 설치 후 Codex 앱을 다시 엽니다.
+
+### GitHub 마켓플레이스에서 설치
+
+이 저장소를 마켓플레이스로 등록한 뒤 Dev Lingo를 설치합니다.
+
+```sh
+codex plugin marketplace add sngchlko/dev-lingo
+codex plugin add dev-lingo@dev-lingo-local
+```
+
+`dev-lingo-local`은 이 저장소에 정의된 마켓플레이스 식별자입니다. 비공개 저장소는 설치하는 컴퓨터에 Git 접근 권한이 필요합니다.
+
+설치 후 Codex의 훅 검토 화면에서 Dev Lingo 훅을 신뢰하도록 설정하고 앱을 다시 엽니다. 플러그인 설치만으로 훅이 자동 신뢰되지는 않습니다.
+
+## 사용법
+
+로컬 Codex 대화에 프롬프트를 입력합니다. `UserPromptSubmit` 훅이 영어 문장과 해설을 표시한 뒤 Codex가 원래 요청을 처리합니다. 별도 명령이나 학습 모드 전환은 필요하지 않습니다.
+
+대화가 시작되면 `SessionStart` 훅이 빈 번역 프로세스 하나를 백그라운드에서 준비합니다. 프롬프트를 제출할 때 준비가 완료되어 있으면 해당 프로세스를 한 번 사용하고 종료한 뒤, 다음 빈 프로세스를 준비합니다. 준비 단계에서는 사용자 프롬프트를 보내거나 모델 응답을 생성하지 않습니다. 준비된 프로세스가 없거나 사용 중이면 새 독립 실행으로 번역합니다.
+
+- **영어 출력:** 다른 언어의 프롬프트는 영어로 옮기고, 영어 프롬프트는 표현과 문법을 다듬습니다.
+- **입력 언어로 해설:** 코드와 기술 식별자를 제외한 본문의 주된 언어를 감지합니다. 언어가 섞이거나 입력이 매우 짧으면 감지가 부정확할 수 있습니다.
+- **문장별 코칭:** 해설은 최종 영어 문장을 기준으로 연결합니다. 원문의 문장을 합치거나 나눌 수 있습니다.
+- **훅 알림:** 결과는 답변 말풍선이 아닌 훅 알림에 표시됩니다. 접혀 있으면 해당 훅 항목을 펼칩니다.
+
+영어 문장 앞의 `통역:` 표시는 현재 모든 입력 언어에서 동일합니다. 해설 표시 이름은 감지한 언어에 따라 `해설:`, `Explanation:`, `解説:`, `Explicación:` 등으로 바뀝니다.
+
+번역을 직접 확인하려면 실행합니다.
+
+```sh
+python3 plugins/dev-lingo/scripts/dev_lingo.py translate \
+  'I think this way have problem. Can you check it one more time?' \
+  --host codex
+```
+
+명령은 영어 문장과 해설을 담은 JSON을 반환합니다.
+
+## 설정
+
+| 환경 변수 | 용도 |
+| --- | --- |
+| `DEV_LINGO_CODEX` | Codex CLI 실행 파일 경로. 지정하지 않으면 PATH와 일반적인 macOS 설치 경로에서 탐색합니다. |
+| `DEV_LINGO_MODEL` | 별도 번역 실행에 사용할 모델 |
+| `DEV_LINGO_COACH_FILE` | 사용자 지정 코치 지침 파일의 절대 경로 |
+| `DEV_LINGO_PREWARM` | `0`으로 설정하면 사전 준비를 끄고 프롬프트마다 독립 실행합니다. 기본은 사전 준비 활성화입니다. |
+
+환경 변수는 앱과 훅 프로세스에도 전달되어야 합니다. 이미 실행 중인 앱은 터미널에서 나중에 설정한 값을 받지 못할 수 있습니다.
+
+번역 모델은 작업 중인 대화에서 선택한 모델과 독립적입니다. 두 실행 경로 모두 기존에 검증한 `gpt-6.1-sol / low`를 명시적으로 사용하며, `DEV_LINGO_MODEL`로 모델을 변경할 수 있습니다. 준비된 번역은 표준 서비스 티어를 사용합니다.
+
+[coach.txt](plugins/dev-lingo/prompts/coach.txt)는 구어체 스타일과 해설 언어 규칙을, [output.schema.json](plugins/dev-lingo/prompts/output.schema.json)은 결과 형식을 정의합니다. 기본 지침을 수정한 뒤에는 설치 스크립트를 다시 실행해 설치본을 갱신합니다.
+
+## 플러그인 관리
+
+### 비활성화와 재활성화
+
+`codex`를 실행하고 `/plugins`를 연 뒤, `dev-lingo-local`에 설치된 Dev Lingo를 선택하고 `Space`로 활성화 상태를 전환합니다.
+
+사용자 설정 파일(기본 `~/.codex/config.toml`)의 해당 항목을 수정할 수도 있습니다.
+
+```toml
+[plugins."dev-lingo@dev-lingo-local"]
+enabled = false
+```
+
+다시 켜려면 `enabled = true`로 변경합니다. 특정 신뢰된 프로젝트에서만 끄려면 해당 프로젝트의 `.codex/config.toml`에 같은 설정을 둡니다. 프로젝트 설정은 사용자 설정보다 우선합니다. 설정 변경 후 앱을 다시 엽니다.
+
+사용하지 않은 준비 프로세스는 번역 없이 2분이 지나면 종료됩니다. 대기 중인 준비 워커를 즉시 중지하려면 설치된 스크립트의 `stop` 명령을 실행합니다.
+
+```sh
+python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.0/scripts/dev_lingo.py stop
+```
+
+진행 중인 번역은 정상적으로 완료됩니다. 플러그인을 비활성화하거나 제거하면 새로운 훅 호출이 중단되며, 사용하지 않은 준비 워커는 같은 유휴 시간 제한에 따라 종료됩니다.
+
+### 업데이트
+
+GitHub 마켓플레이스로 설치했다면 실행합니다.
+
+```sh
+codex plugin marketplace upgrade dev-lingo-local
+codex plugin add dev-lingo@dev-lingo-local
+```
+
+로컬 설치는 소스를 갱신한 뒤 다시 실행합니다.
+
+```sh
+python3 scripts/install.py --trust-hook
+```
+
+훅 정의가 변경되면 신뢰 검토가 다시 필요할 수 있습니다. 업데이트 후 앱을 다시 엽니다.
+
+### 삭제
+
+플러그인과 설치 캐시를 제거합니다.
+
+```sh
+codex plugin remove dev-lingo@dev-lingo-local
+```
+
+마켓플레이스 등록도 제거하려면 실행합니다.
+
+```sh
+codex plugin marketplace remove dev-lingo-local
+```
+
+앱을 다시 열면 제거 상태가 반영됩니다. 별도로 내려받은 소스 파일과 ZIP 파일은 디스크에 남습니다.
+
+## 동작 방식
+
+```mermaid
+flowchart TD
+    S["대화 시작 / 이전 번역 완료"] --> P["빈 프로세스 하나 준비"]
+    U["원래 프롬프트"] --> H["UserPromptSubmit 훅"]
+    H -->|"훅 종료 후 원문 그대로"| M["작업 중인 Codex 대화"]
+    M --> W["원래 요청 수행"]
+    P --> T["한 번만 사용하는 임시 Codex 스레드"]
+    H -->|"이번 프롬프트만"| T
+    C["코치 지침"] --> T
+    T --> V["영어 문장과 해설 검증"]
+    V --> N["systemMessage 알림"]
+```
+
+훅은 동기적으로 실행하므로 번역하는 동안 원래 작업의 시작이 지연됩니다. Dev Lingo는 번역 이벤트 스트림을 읽고 `turn.completed`로 완료를 확인하면 CLI의 나머지 종료 처리를 기다리지 않고 알림을 반환합니다.
+
+사전 준비는 입력이 도착하기 전에 빈 스레드를 만드는 Pocket Lingo의 방식을 따릅니다. 로컬 워커는 아직 사용하지 않은 Codex 프로세스 하나를 유지하고, 사용자 전용 임시 디렉터리의 Unix 소켓으로 요청을 받습니다. 각 프로세스는 번역을 최대 한 번 처리한 뒤 종료됩니다. 워커는 번역 없이 2분이 지나면 종료됩니다. 첫 요청이나 준비할 시간이 부족한 요청에서는 지연 감소 효과가 작을 수 있습니다.
+
+준비 워커는 대기 중에도 메모리를 사용합니다. 반복된 준비 요청은 잠금 상태를 확인해 중복 프로세스 실행을 피합니다. 실행한 워커는 백그라운드에서 종료를 기다려 회수하고, 번역 종료 시에는 Codex 프로세스의 종료를 확인한 뒤 같은 프로세스 그룹에 남은 자식도 정리합니다.
+
+### 컨텍스트 분리
+
+각 번역은 새 임시 디렉터리에서 아직 사용하지 않은 프로세스로 실행합니다. Dev Lingo는 작업 중인 세션을 resume/fork하거나 대화 기록을 읽거나 프로젝트 파일을 수집하지 않습니다. 번역에 전달하는 사용자 데이터는 이번 프롬프트뿐입니다. 사용한 번역 프로세스는 종료합니다.
+
+사전 준비 경로는 `codex app-server`를 사용하며, 이 명령에는 사용자 설정 전체를 무시하는 옵션이 없습니다. Dev Lingo는 코치 지침을 명시적으로 전달하고 개인 개발자 지침을 비우며, 프로젝트 문서 로딩을 끕니다. 해당 프로세스와 스레드에서 훅·플러그인·앱·메모리·서브에이전트·쉘 실행·스킬 검색·웹 검색·개인 MCP 서버·알림 명령도 비활성화합니다. 독립 실행으로 대체할 때 사용하는 `codex exec`는 사용자 설정과 실행 규칙도 무시합니다. 개인 설정 파일은 수정하지 않습니다. 부모 대화와 플러그인 관련 환경 변수를 걸러내고, 재호출 방지 장치로 번역 훅의 재귀 실행을 막습니다.
+
+훅 출력은 UI 알림용 `systemMessage`만 사용합니다. `additionalContext`나 모델 입력으로 들어가는 일반 텍스트는 반환하지 않습니다. [컨텍스트 분리 통합 테스트](tests/check_context_isolation.py)는 실제 Codex CLI와 app-server 요청을 캡처해 이 경계를 검증합니다.
+
+[준비된 번역 테스트](tests/check_prepared_isolation.py)는 준비 단계에서 모델 추론을 실행하지 않는지, 개인 지침과 연동 기능이 비활성 상태인지, 이전 번역의 입력이 다음 요청에 포함되지 않는지 확인합니다.
+
+### 번역 기록
+
+Dev Lingo는 학습 기록 파일이나 데이터베이스를 유지하지 않습니다. 준비된 스레드는 `ephemeral: true`를, 독립 실행은 `--ephemeral`을 사용합니다. 결과는 메모리에서 처리하고 실행 후 임시 작업 디렉터리를 삭제합니다. 이전 번역은 다음 실행의 컨텍스트로 재사용하지 않습니다. 준비 워커의 임시 디렉터리에는 소켓과 빈 잠금 파일만 있으며 프롬프트나 결과는 저장하지 않습니다.
+
+이 설명은 Dev Lingo 자체의 번역 저장에 한정됩니다. 원래 Codex 대화, Codex 알림과 진단, 사용량 기록, 모델 제공자의 데이터 보관 정책은 변경하지 않습니다.
+
+## 제한 사항과 문제 해결
+
+- 현재 macOS와 Linux의 로컬 Codex만 지원합니다. Windows, 클라우드 대화, 다른 코딩 에이전트는 지원 범위에 포함하지 않습니다.
+- 번역마다 Codex 사용량을 소비하며 원래 작업의 시작이 지연됩니다.
+- 독립 번역의 제한 시간은 45초, 준비된 번역은 40초, 훅은 55초입니다. 오류·인증 실패·사용량 제한·시간 초과 시 알림을 생략하고 원래 작업을 진행합니다. 준비된 실행이 프롬프트를 받았을 가능성이 있으면 다른 모델 호출로 자동 재시도하지 않습니다.
+- 빈 프롬프트, 16,000자를 넘는 프롬프트, 64 KiB를 넘는 훅 입력은 생략합니다.
+
+| 증상 | 확인 사항 |
+| --- | --- |
+| Codex 실행 파일을 찾지 못함 | CLI 설치, PATH, `DEV_LINGO_CODEX` |
+| 설치 후 알림이 표시되지 않음 | CLI 인증, 플러그인 활성화, 훅 신뢰 상태, 앱 재시작 |
+| 결과가 보이지 않음 | 접힌 훅 항목을 펼치고 로컬 대화인지 확인 |
+| 일부 프롬프트에서만 생략됨 | 입력 크기, 사용량 제한, 직접 번역 명령의 오류 |
+| 작업 시작 전에 잠시 대기함 | 동기 번역 훅의 정상 동작 |
+
+설치와 인증 상태를 확인합니다.
+
+```sh
+codex plugin list --marketplace dev-lingo-local --json
+codex login status
+```
+
+## 개발
+
+프로젝트 루트에서 실행합니다.
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 tests/check_context_isolation.py
+python3 tests/check_prepared_isolation.py
+python3 tests/check_lifecycle.py
+```
+
+단위 테스트는 호스트 선택, 문장별 해설, 결과 검증, 오류 처리, 실행 격리, 스트림 완료, 시간 초과, 프로세스 정리를 확인합니다. 통합 테스트에는 설치 및 신뢰 설정이 완료된 Dev Lingo가 필요합니다. 요청을 의도적으로 거부하는 로컬 제공자로 요청을 캡처하므로 외부 모델은 호출하지 않습니다. 테스트 훅의 신뢰 우회는 해당 테스트 실행에만 적용됩니다.
+
+수명 주기 검사는 로컬 테스트용 Codex와 실제 워커 프로세스로 실패한 요청, 처리 중 취소, 강제 종료를 포함한 100회 요청을 수행합니다. 워커 메모리, 열린 파일 수, 프로세스 상태를 확인해 `reports/lifecycle-check.json`에 기록합니다. 모델 추론 사용량은 소비하지 않으며, 유한한 검사로 모든 상황의 누수 부재를 보장하지는 않습니다.
+
+선택적으로 실행하는 실제 모델 평가는 Codex 사용량을 소비합니다.
+
+```sh
+python3 tests/evaluate_languages.py
+python3 tests/evaluate_latency.py
+python3 tests/evaluate_prewarm.py
+```
+
+지연 시간 평가는 CLI 종료를 기다리는 방식과 번역 완료를 확인한 즉시 반환하는 방식을 비교합니다. 테스트 입력과 결과는 `reports/latency-evaluation.json`에 저장합니다. 이 기록은 명시적으로 실행한 개발용 평가이며 일반적인 플러그인 사용과 별개입니다.
+
+사전 준비 평가는 독립 실행과 준비된 실행을 번갈아 수행하는 8쌍으로 구성합니다. 준비된 실행의 시간 측정은 설정과 3초의 모의 타이핑 시간이 지난 뒤 시작하며, 로컬 프로세스 간 통신·결과 검증·프로세스 정리를 포함합니다. 결과는 `reports/prewarm-evaluation.json`에 저장합니다. 준비되지 않은 첫 요청의 지연 시간을 나타내는 결과는 아닙니다.
+
+| 파일 | 역할 |
+| --- | --- |
+| [dev_lingo.py](plugins/dev-lingo/scripts/dev_lingo.py) | CLI 진입점과 훅 실행 흐름 |
+| [hosts.py](plugins/dev-lingo/scripts/hosts.py) | 호스트별 훅 입력과 알림 출력 |
+| [codex_provider.py](plugins/dev-lingo/scripts/codex_provider.py) | 격리된 Codex 실행, 시간 제한, 결과 수집 |
+| [codex_prepared.py](plugins/dev-lingo/scripts/codex_prepared.py) | 빈 임시 스레드 준비와 일회성 번역 |
+| [prewarm.py](plugins/dev-lingo/scripts/prewarm.py) | 전용 로컬 워커, 동시 요청의 대체 실행, 유휴 상태 종료 |
+| [lingo_core.py](plugins/dev-lingo/scripts/lingo_core.py) | 결과 검증, 문장 표시, 환경 변수 필터링 |
+| [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json) | 마켓플레이스 카탈로그 |
+| [.codex-plugin/plugin.json](plugins/dev-lingo/.codex-plugin/plugin.json) | 플러그인 메타데이터 |
