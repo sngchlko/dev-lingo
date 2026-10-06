@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register and install this local marketplace with native Codex commands."""
+"""Install a local or GitHub marketplace and verify its hook trust."""
 import argparse
 import hashlib
 import json
@@ -39,15 +39,26 @@ def verify_installed_copy(hook):
 
 def main():
     parser = argparse.ArgumentParser(description="Install Dev Lingo for local Codex chats")
+    parser.add_argument("--marketplace", default=str(ROOT), metavar="SOURCE",
+                        help="Marketplace source (default: this checkout); use sngchlko/dev-lingo for GitHub installs")
     parser.add_argument("--trust-hook", action="store_true", help="Trust only this package's matching installed hook after reviewing its source")
     args = parser.parse_args()
+    if sys.platform not in {"darwin", "linux"}:
+        parser.error("Dev Lingo currently supports macOS and Linux only. "
+                     "Native Windows / PowerShell hook execution is not supported.")
     if not shutil.which("codex"):
         parser.error("Codex CLI must be installed and available in PATH")
-    for command in [["codex", "plugin", "marketplace", "add", str(ROOT), "--json"],
+    for command in [["codex", "plugin", "marketplace", "add", args.marketplace, "--json"],
                     ["codex", "plugin", "add", PLUGIN_ID, "--json"]]:
         result = subprocess.run(command, text=True, capture_output=True)
         if result.returncode:
             print(result.stderr, file=sys.stderr)
+            if "already added from a different source" in result.stderr:
+                print("A marketplace named dev-lingo-local is registered from another source. "
+                      "For an existing GitHub registration, rerun with "
+                      "--marketplace sngchlko/dev-lingo --trust-hook. "
+                      "To deliberately switch sources, remove only the marketplace registration "
+                      "with: codex plugin marketplace remove dev-lingo-local", file=sys.stderr)
             return result.returncode
     client = Client()
     try:

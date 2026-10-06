@@ -32,6 +32,7 @@ Dev Lingo가 훅 알림을 표시합니다.
 - macOS 또는 Linux의 로컬 Codex 환경
 - 설치 및 로그인된 Codex CLI — 검증 버전: `0.160.1`
 - Python `3.9` 이상 — 추가 Python 패키지 불필요
+- GitHub 설치 시 터미널에서 실행 가능한 Git
 
 설치 전에 환경을 확인합니다.
 
@@ -45,32 +46,47 @@ codex login status
 
 ## 설치
 
+**현재 macOS와 Linux만 지원합니다. Windows 네이티브 환경과 Windows PowerShell에서는 Dev Lingo를 사용할 수 없습니다.** 아래 설치 명령으로 Windows 지원이 추가되지는 않습니다.
+
+명령은 Codex 대화 입력창이 아닌 컴퓨터의 **터미널**에서 실행합니다. Git, Python, 별도 Codex CLI가 필요합니다. 데스크톱 앱 설치만으로 이 요구사항이 갖춰지는 것은 아닙니다.
+
+### GitHub에서 설치 (권장)
+
+설치 파일을 검증할 수 있도록 소스를 내려받고, GitHub 마켓플레이스에서 설치한 뒤 일치하는 훅을 신뢰하도록 설정합니다.
+
+```sh
+git clone https://github.com/sngchlko/dev-lingo.git
+cd dev-lingo
+python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+```
+
+설치 스크립트는 GitHub 마켓플레이스를 등록하고 Dev Lingo를 설치합니다. 설치된 코드와 훅 정의가 내려받은 소스와 일치하는지 확인한 뒤 두 훅의 신뢰 설정을 완료합니다. 아래 마켓플레이스 명령으로 이미 설치한 경우에도 사용할 수 있습니다. 이미 소스를 내려받았다면 다시 복제하지 않고 해당 폴더에서 `git pull --ff-only`로 갱신합니다.
+
+성공하면 `installed: true`, `enabled: true`, `hook_trust: trusted`, `hook_count: 2`가 표시됩니다. Codex 앱을 완전히 종료한 뒤 다시 열고, 새 로컬 대화에서 사용합니다.
+
+설치 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다. 신뢰 설정을 직접 검토하려면 아래 수동 설치 절차를 사용합니다.
+
+### 마켓플레이스 명령으로 수동 설치
+
+```sh
+codex plugin marketplace add sngchlko/dev-lingo
+codex plugin add dev-lingo@dev-lingo-local
+codex
+```
+
+열린 **Codex CLI**에서 `/hooks`를 입력합니다. Dev Lingo의 `SessionStart`, `UserPromptSubmit` 두 훅을 검토하고 신뢰하도록 설정합니다. CLI를 종료한 뒤 데스크톱 앱도 완전히 종료하고 다시 열어 새 로컬 대화를 시작합니다. 플러그인을 설치하고 활성화해도 훅은 미신뢰 상태이므로, 이 단계를 마쳐야 번역이 실행됩니다. [공식 훅 신뢰 안내](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)를 참고하세요.
+
+`dev-lingo-local`은 이 저장소에 정의된 마켓플레이스 식별자로, GitHub에서 설치해도 같습니다. 비공개 저장소는 설치하는 컴퓨터에 Git 접근 권한이 필요합니다.
+
 ### 로컬 소스에서 설치
 
-소스를 내려받고 프로젝트 루트에서 실행합니다.
+개발용 소스나 ZIP을 사용한다면 프로젝트 루트에서 실행합니다.
 
 ```sh
 python3 scripts/install.py --trust-hook
 ```
 
-설치 스크립트는 Codex의 플러그인 명령으로 마켓플레이스를 등록하고 Dev Lingo를 설치합니다. `--trust-hook`을 사용하면 설치된 코드와 훅 정의가 원본과 일치하는지 확인한 뒤 Dev Lingo의 준비 훅과 번역 훅을 신뢰하도록 설정합니다.
-
-설치 전에 [훅 정의](plugins/dev-lingo/hooks/hooks.json)와 [실행 코드](plugins/dev-lingo/scripts/)를 검토할 수 있습니다. Codex의 훅 검토 화면에서 직접 신뢰 설정을 관리하려면 `--trust-hook`을 생략합니다.
-
-설치가 완료되면 `installed: true`, `enabled: true`, `hook_trust: trusted`가 표시됩니다. 설치 후 Codex 앱을 다시 엽니다.
-
-### GitHub 마켓플레이스에서 설치
-
-이 저장소를 마켓플레이스로 등록한 뒤 Dev Lingo를 설치합니다.
-
-```sh
-codex plugin marketplace add sngchlko/dev-lingo
-codex plugin add dev-lingo@dev-lingo-local
-```
-
-`dev-lingo-local`은 이 저장소에 정의된 마켓플레이스 식별자입니다. 비공개 저장소는 설치하는 컴퓨터에 Git 접근 권한이 필요합니다.
-
-설치 후 Codex의 훅 검토 화면에서 Dev Lingo 훅을 신뢰하도록 설정하고 앱을 다시 엽니다. 플러그인 설치만으로 훅이 자동 신뢰되지는 않습니다.
+이 명령은 해당 폴더를 로컬 마켓플레이스로 등록합니다. `dev-lingo-local`이 이미 GitHub로 등록되어 있다면 권장 설치 명령처럼 `--marketplace sngchlko/dev-lingo`를 지정합니다. 등록 소스를 바꾸려면 먼저 `codex plugin marketplace remove dev-lingo-local`로 기존 등록을 제거하고 설치 스크립트를 다시 실행합니다. 이 명령은 등록만 제거하며 설치된 플러그인은 삭제하지 않습니다.
 
 ## 사용법
 
@@ -135,11 +151,13 @@ python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.0/scripts/dev_lingo
 
 ### 업데이트
 
-GitHub 마켓플레이스로 설치했다면 실행합니다.
+GitHub 마켓플레이스와 내려받은 소스를 갱신한 뒤 새 설치본을 검증하고 신뢰하도록 설정합니다.
 
 ```sh
 codex plugin marketplace upgrade dev-lingo-local
-codex plugin add dev-lingo@dev-lingo-local
+# 내려받은 dev-lingo 폴더에서 실행:
+git pull --ff-only
+python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
 로컬 설치는 소스를 갱신한 뒤 다시 실행합니다.
@@ -212,6 +230,8 @@ Dev Lingo는 학습 기록 파일이나 데이터베이스를 유지하지 않�
 
 | 증상 | 확인 사항 |
 | --- | --- |
+| `already added from a different source` | GitHub로 등록했다면 `--marketplace sngchlko/dev-lingo`를 지정합니다. 소스를 바꾸려면 기존 마켓플레이스 등록을 먼저 제거합니다. |
+| Windows / PowerShell 설치 또는 훅 실행 실패 | Windows 네이티브 실행은 현재 지원하지 않습니다. `plugin add`의 OS 오류 원인은 전체 메시지와 오류 번호로 별도 확인해야 합니다. |
 | Codex 실행 파일을 찾지 못함 | CLI 설치, PATH, `DEV_LINGO_CODEX` |
 | 설치 후 알림이 표시되지 않음 | CLI 인증, 플러그인 활성화, 훅 신뢰 상태, 앱 재시작 |
 | 결과가 보이지 않음 | 접힌 훅 항목을 펼치고 로컬 대화인지 확인 |

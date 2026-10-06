@@ -32,6 +32,7 @@ Each explanation belongs to a final English sentence. Sentences without a useful
 - A local Codex environment on macOS or Linux.
 - Codex CLI installed and signed in. Tested with version `0.160.1`.
 - Python `3.9` or later. No additional Python packages required.
+- Git available in the terminal for GitHub installation.
 
 Check your environment before installing:
 
@@ -45,32 +46,47 @@ If authentication is needed, run `codex login`.
 
 ## Installation
 
+**Supported platforms: macOS and Linux only. Dev Lingo does not currently run in native Windows or Windows PowerShell.** The commands below do not add Windows support.
+
+Run these commands in your computer's **terminal**, rather than the Codex chat input. Git, Python, and the standalone Codex CLI must be available there; installing the desktop app alone does not establish these prerequisites.
+
+### From GitHub (recommended)
+
+Download the source so the installer can verify the installed plugin, then install from the GitHub marketplace and trust its matching hooks:
+
+```sh
+git clone https://github.com/sngchlko/dev-lingo.git
+cd dev-lingo
+python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
+```
+
+The installer registers the GitHub marketplace, installs Dev Lingo, and checks that the installed code and hook definitions match this checkout before trusting the two hooks. It also works when you have already run the marketplace commands below. If you already have the checkout, run `git pull --ff-only` instead of cloning again.
+
+A successful installation reports `installed: true`, `enabled: true`, `hook_trust: trusted`, and `hook_count: 2`. Completely quit and reopen the Codex app, then start a new local chat.
+
+You can review the [hook definition](plugins/dev-lingo/hooks/hooks.json) and [execution code](plugins/dev-lingo/scripts/) before installing. To review trust interactively, use the manual steps below.
+
+### Manual marketplace installation
+
+```sh
+codex plugin marketplace add sngchlko/dev-lingo
+codex plugin add dev-lingo@dev-lingo-local
+codex
+```
+
+In the **Codex CLI** that opens, enter `/hooks`. Review and trust both Dev Lingo hooks: `SessionStart` and `UserPromptSubmit`. Then exit the CLI, completely quit and reopen the desktop app, and start a new local chat. Plugin installation and activation alone leave these hooks untrusted, so translation will not run until this step is complete. See the official [hook trust instructions](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
+
+`dev-lingo-local` is the marketplace identifier defined in this repository, including when installed from GitHub. A private repository requires Git access on the installation machine.
+
 ### From local source
 
-Download the source and run this command from the project root:
+For development or a downloaded ZIP, run from the extracted project root:
 
 ```sh
 python3 scripts/install.py --trust-hook
 ```
 
-The installer registers the marketplace and installs Dev Lingo through Codex's plugin commands. With `--trust-hook`, it verifies that the installed code and hook definitions match the source, then trusts Dev Lingo's preparation and translation hooks.
-
-You can review the [hook definition](plugins/dev-lingo/hooks/hooks.json) and [execution code](plugins/dev-lingo/scripts/) before installing. To manage trust through Codex's hook review UI, omit `--trust-hook`.
-
-A successful installation reports `installed: true`, `enabled: true`, and `hook_trust: trusted`. Reopen the Codex app after installation.
-
-### From a GitHub marketplace
-
-Register this repository as a marketplace and install Dev Lingo:
-
-```sh
-codex plugin marketplace add sngchlko/dev-lingo
-codex plugin add dev-lingo@dev-lingo-local
-```
-
-`dev-lingo-local` is the marketplace identifier defined in this repository. Private repositories require Git access on the installation machine.
-
-After installing, trust the Dev Lingo hook in Codex's hook review UI and reopen the app. Installing the plugin alone does not trust its hook.
+This registers the checkout as a local marketplace. If `dev-lingo-local` is already registered from GitHub, use the recommended command with `--marketplace sngchlko/dev-lingo` instead. To deliberately switch marketplace sources, first remove the old registration with `codex plugin marketplace remove dev-lingo-local`, then rerun the installer. This removes the registration, not the installed plugin.
 
 ## Usage
 
@@ -135,11 +151,13 @@ An active translation finishes normally. Disabling or removing the plugin preven
 
 ### Update
 
-For a GitHub marketplace installation:
+For a GitHub marketplace installation, update the marketplace and the downloaded source, then verify and trust the new installed copy:
 
 ```sh
 codex plugin marketplace upgrade dev-lingo-local
-codex plugin add dev-lingo@dev-lingo-local
+# Run from your dev-lingo checkout:
+git pull --ff-only
+python3 scripts/install.py --marketplace sngchlko/dev-lingo --trust-hook
 ```
 
 For a local installation, update the source and rerun:
@@ -212,6 +230,8 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 
 | Symptom | What to check |
 | --- | --- |
+| `already added from a different source` | Use `--marketplace sngchlko/dev-lingo` for an existing GitHub registration, or explicitly remove the old marketplace registration before switching sources. |
+| Windows / PowerShell installation or hook failure | Native Windows is currently unsupported. An OS error from `plugin add` needs its complete message and error number to diagnose separately. |
 | Codex executable cannot be found | CLI installation, PATH, or `DEV_LINGO_CODEX`. |
 | No notification after installation | CLI authentication, plugin activation, hook trust, and app restart. |
 | Output seems hidden | Expand the hook entry and confirm you are in a local conversation. |
