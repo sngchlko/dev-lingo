@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Capture the actual Codex model request locally, without an inference call.
 
-Checks native sync UI output and the installed asynchronous plugin. The local
-provider delays/rejects inference so no external model is called.
+Checks native sync UI output with the desktop's warning opt-out setting.
+The local provider rejects inference so no external model is called.
 """
 import json
 import os
@@ -33,7 +33,7 @@ def check(app_server=False):
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             captured.append(json.loads(raw))
             request_times.append(time.time())
-            time.sleep(3 if app_server and len(captured) == 1 else 0.2)
+            time.sleep(0.2)
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -81,13 +81,14 @@ def check(app_server=False):
                     source.write_text('using System;using System.IO;using System.Text;using System.Threading;class Fixture{static void Main(){Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);Console.In.ReadToEnd();Thread.Sleep(2000);File.WriteAllText(%s,"executed");Console.WriteLine(%s);Console.WriteLine("{\\\"type\\\":\\\"turn.completed\\\"}");}}' % (json.dumps(str(marker)), json.dumps(message)), encoding="utf-8")
                     subprocess.run([str(compiler), "/nologo", "/out:" + str(fake_codex), str(source)], check=True, capture_output=True)
                 env = dict(os.environ, DEV_LINGO_CODEX=str(fake_codex), DEV_LINGO_PREWARM="0")
-                client = Client([find_codex(), "app-server"] + options, env=env)
+                client = Client([find_codex(), "app-server"] + options, env=env,
+                                capabilities={"optOutNotificationMethods": ["warning"]})
                 try:
                     listed = client.call("hooks/list", {"cwds": [str(root)]})
                     fixture_hooks = [hook for entry in listed["data"] for hook in entry["hooks"] if hook.get("pluginId") == "dev-lingo@dev-lingo-local"]
                     assert len(fixture_hooks) == 2 and all(h["trustStatus"] == "trusted" for h in fixture_hooks), "Install and trust Dev Lingo before the app-server integration check"
                     definition = json.loads(Path(fixture_hooks[0]["sourcePath"]).read_text(encoding="utf-8"))
-                    assert definition["hooks"]["UserPromptSubmit"][0]["hooks"][0].get("async") is True, "Expected an installed background translation hook"
+                    assert not definition["hooks"]["UserPromptSubmit"][0]["hooks"][0].get("async", False), "Desktop delivery requires a synchronous hook result"
                     thread_config = {"features.hooks": True, "features.plugins": True, "project_doc_max_bytes": 0}
                     thread = client.call("thread/start", {"cwd": str(root), "ephemeral": True, "config": thread_config,
                         "baseInstructions": "Test model context isolation only.", "developerInstructions": "",
@@ -98,14 +99,9 @@ def check(app_server=False):
                         client.notifications.append(notification)
                         if notification.get("method") == "turn/completed":
                             break
-                    deadline = time.monotonic() + 10
-                    while not marker.exists():
-                        assert time.monotonic() < deadline, "Background translation did not finish"
-                        time.sleep(.05)
-                    assert request_times[0] < marker.stat().st_mtime, "Working model waited for translation completion"
-                    # An idle turn may defer informational output. A follow-up
-                    # provides a safe delivery point without any context injection.
-                    time.sleep(.2)
+                    assert marker.exists(), "Installed translation did not finish"
+                    assert request_times[0] >= marker.stat().st_mtime, "Synchronous hook did not finish before the working request"
+                    # Verify a follow-up also excludes the UI translation.
                     client.call("turn/start", {"threadId": thread["id"], "input": [{"type": "text", "text": "DEV_LINGO_FOLLOWUP_PROBE"}]})
                     while True:
                         notification = client.messages.get(timeout=20)
@@ -117,16 +113,11 @@ def check(app_server=False):
                     assert marker.exists(), "App-server hook did not execute: " + json.dumps([n for n in client.notifications if n.get("method") == "warning"])
                     assert ui_seen, "Translation UI notification missing: " + json.dumps([n for n in client.notifications if "hook" in str(n.get("method", "")) or "warning" in str(n.get("method", ""))])
                     expected_message = "통역: " + SENTINEL + "\n解説: " + EXPLANATION_SENTINEL + "\n통역: Thanks!"
-                    def has_text(value):
-                        if isinstance(value, str):
-                            return value == expected_message
-                        if isinstance(value, dict):
-                            return any(has_text(item) for item in value.values())
-                        if isinstance(value, list):
-                            return any(has_text(item) for item in value)
-                        return False
                     warnings = [event for event in client.notifications if event.get("method") == "warning"]
-                    assert any(has_text(event.get("params")) for event in warnings), "Paired translation was not delivered as a UI-only warning: " + json.dumps(warnings, ensure_ascii=False)
+                    assert not warnings, "Desktop warning opt-out was not reproduced"
+                    entries = [entry for event in client.notifications if event.get("method") == "hook/completed"
+                               for entry in event.get("params", {}).get("run", {}).get("entries", [])]
+                    assert any(entry.get("kind") == "warning" and entry.get("text") == expected_message for entry in entries), "Paired translation did not arrive through the desktop-supported hook/completed event"
                     result = subprocess.CompletedProcess([], 0, "", "")
                 finally:
                     client.close()
@@ -144,8 +135,82 @@ def check(app_server=False):
             print(json.dumps({"surface": "app-server" if app_server else "exec", "hook_executed": True,
                               "model_requests_captured": len(captured), "original_prompt_present": True,
                               "ui_translation_absent_from_model_input": True,
-                              "working_request_before_translation_finished": True if app_server else None,
+                              "desktop_warning_opt_out": True if app_server else None,
+                              "desktop_hook_result_notification_present": ui_seen if app_server else None,
                               "native_ui_notification_present": ui_seen if app_server else None}))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def check_async_warning_opt_out():
+    """A completed async hook remains invisible with the app's capability."""
+    captured = []
+    class Capture(BaseHTTPRequestHandler):
+        def do_POST(self):
+            captured.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error":{"message":"local desktop transport check","type":"invalid_request_error"}}')
+        def log_message(self, *args):
+            pass
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Capture)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        with tempfile.TemporaryDirectory(prefix="dev-lingo-warning-optout-") as directory:
+            root = Path(directory)
+            marker = root / "async-finished"
+            fixture = root / "async.py"
+            fixture.write_text("import sys,time,json\nfrom pathlib import Path\nsys.stdin.read()\ntime.sleep(.3)\nprint(json.dumps({'systemMessage':%r}),flush=True)\nPath(%r).touch()\n" % (SENTINEL, str(marker)), encoding="utf-8")
+            command = subprocess.list2cmdline([sys.executable, str(fixture)]) if os.name == "nt" else shlex.join([sys.executable, str(fixture)])
+            handler = '{type="command",async=true,command=' + json.dumps(command) + '}'
+            provider = '{name="Local capture",base_url="http://127.0.0.1:%s/v1",wire_api="responses",supports_websockets=false,requires_openai_auth=false}' % server.server_port
+            options = [find_codex(), "app-server",
+                       "-c", 'model_provider="dev_lingo_transport_check"', "-c", 'model="capture-model"',
+                       "-c", "model_providers.dev_lingo_transport_check=" + provider,
+                       "-c", "features.enable_request_compression=false", "-c", "project_doc_max_bytes=0",
+                       "-c", "hooks.UserPromptSubmit=[{hooks=[" + handler + "]}]",
+                       "--enable", "hooks", "--disable", "plugins", "--disable", "apps"]
+            home = root / "codex-home"
+            home.mkdir()
+            client = Client(options, env=dict(os.environ, CODEX_HOME=str(home)),
+                            capabilities={"optOutNotificationMethods": ["warning"]})
+            events = []
+            try:
+                hooks = [hook for entry in client.call("hooks/list", {"cwds": [directory]})["data"]
+                         for hook in entry["hooks"] if hook["enabled"]]
+                assert len(hooks) == 1, "Expected only the isolated async fixture"
+                hook = hooks[0]
+                client.call("config/batchWrite", {"edits": [{
+                    "keyPath": "hooks.state." + json.dumps(hook["key"]) + ".trusted_hash",
+                    "mergeStrategy": "upsert", "value": hook["currentHash"]}], "reloadUserConfig": True})
+                thread = client.call("thread/start", {"cwd": directory, "ephemeral": True,
+                    "baseInstructions": "Test notification transport only.", "developerInstructions": "",
+                    "approvalPolicy": "never", "sandbox": "read-only"})["thread"]
+                def turn(text):
+                    client.call("turn/start", {"threadId": thread["id"], "input": [{"type": "text", "text": text}]})
+                    while True:
+                        event = client.messages.get(timeout=10)
+                        events.append(event)
+                        if event.get("method") == "turn/completed":
+                            break
+                turn("ASYNC_TRANSPORT_ORIGINAL")
+                deadline = time.monotonic() + 5
+                while not marker.exists():
+                    assert time.monotonic() < deadline, "Async fixture did not execute"
+                    time.sleep(.02)
+                time.sleep(.3)
+                turn("ASYNC_TRANSPORT_FOLLOWUP")
+                assert len(captured) == 2
+                assert not any(event.get("method") == "warning" for event in events)
+                assert not any(event.get("method") == "hook/completed" for event in events)
+                assert SENTINEL not in json.dumps([request.get("input") for request in captured])
+                print(json.dumps({"surface": "desktop-capability-reproduction", "async_hook_finished": True,
+                                  "warning_opted_out": True, "async_notification_visible": False,
+                                  "translation_absent_from_model_input": True}))
+            finally:
+                client.close()
     finally:
         server.shutdown()
         server.server_close()
@@ -154,3 +219,4 @@ def check(app_server=False):
 if __name__ == "__main__":
     check(False)
     check(True)
+    check_async_warning_opt_out()

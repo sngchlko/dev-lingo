@@ -12,7 +12,7 @@ from codex_provider import stop_process
 
 
 class Client:
-    def __init__(self, command=None, env=None):
+    def __init__(self, command=None, env=None, capabilities=None):
         self.process = spawn_isolated(command or [find_codex(), "app-server"], stdin=subprocess.PIPE,
                                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=env)
         self.messages = queue.Queue()
@@ -21,7 +21,7 @@ class Client:
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
         self.call("initialize", {"clientInfo": {"name": "dev_lingo_setup", "version": "0.1.0"},
-                                 "capabilities": {"experimentalApi": True}})
+                                 "capabilities": dict({"experimentalApi": True}, **(capabilities or {}))})
         self.send({"method": "initialized"})
 
     def _read(self):
