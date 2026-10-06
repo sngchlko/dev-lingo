@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import signal
 import sys
 
 from hosts import get_host
@@ -44,6 +45,11 @@ def main():
     parser.add_argument("--host", default="codex", help="Execution host; codex is connected, claude is reserved for future support")
     args = parser.parse_args()
     if args.action == "hook":
+        # Background hooks can be cancelled when their session ends. Let
+        # translation finally blocks reap their owned processes on SIGTERM.
+        def cancelled(*_):
+            raise SystemExit(0)
+        signal.signal(signal.SIGTERM, cancelled)
         return hook(args.host)
     if args.action in {"prepare", "stop"}:
         if not is_windows() and args.host == "codex" and os.environ.get("DEV_LINGO_TRANSLATOR") != "1":

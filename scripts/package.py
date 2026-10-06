@@ -23,7 +23,7 @@ FILES = [
 
 
 if __name__ == "__main__":
-    output = ROOT / "dist/dev-lingo-0.1.2.zip"
+    output = ROOT / "dist/dev-lingo-0.1.3.zip"
     output.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         for name in FILES:

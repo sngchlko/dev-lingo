@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import signal
 import unittest
 from unittest.mock import patch
 
@@ -21,6 +22,38 @@ def events(value=RESULT):
 
 @unittest.skipIf(os.name == "nt", "POSIX fixtures; Windows streams have their own tests")
 class StreamingTests(unittest.TestCase):
+    def test_cancelled_background_hook_reaps_translation_and_removes_workdir(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker = root / "child.json"
+            fake = root / "fake-codex"
+            fake.write_text("#!" + sys.executable + "\nimport sys,os,json,time,signal\nfrom pathlib import Path\nsys.stdin.read()\nsignal.signal(signal.SIGTERM,signal.SIG_IGN)\nPath(%r).write_text(json.dumps({'pid':os.getpid(),'cwd':sys.argv[sys.argv.index('--cd')+1]}))\ntime.sleep(20)\n" % str(marker))
+            fake.chmod(0o700)
+            script = Path(codex_provider.__file__).with_name("dev_lingo.py")
+            env = dict(os.environ, DEV_LINGO_CODEX=str(fake), DEV_LINGO_PREWARM="0", DEV_LINGO_TRANSLATOR="0")
+            process = subprocess.Popen([sys.executable, str(script), "hook"], stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            try:
+                process.stdin.write(json.dumps({"hook_event_name": "UserPromptSubmit", "prompt": "고마워!"}).encode())
+                process.stdin.close()
+                deadline = time.monotonic() + 5
+                while not marker.exists():
+                    self.assertIsNone(process.poll())
+                    self.assertLess(time.monotonic(), deadline)
+                    time.sleep(.01)
+                child = json.loads(marker.read_text())
+                process.send_signal(signal.SIGTERM)
+                self.assertEqual(process.wait(timeout=3), 0)
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child["pid"], 0)
+                self.assertFalse(Path(child["cwd"]).exists())
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait()
+                process.stdout.close()
+                process.stderr.close()
+
     def setUp(self):
         self.environment = patch.dict(os.environ, {"DEV_LINGO_PREWARM": "0"})
         self.environment.start()

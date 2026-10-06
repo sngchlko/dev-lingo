@@ -169,13 +169,13 @@ class TranslationIsolationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 lingo.validate_result({"explanation_label": label, "sentences": [SENTENCE]})
 
-    def test_plugin_has_no_skills_or_mcp_context_and_uses_supported_sync_hook(self):
+    def test_plugin_has_no_skills_or_mcp_context_and_uses_background_hook(self):
         plugin = json.loads((ROOT / "plugins/dev-lingo/.codex-plugin/plugin.json").read_text())
         self.assertNotIn("skills", plugin)
         self.assertNotIn("mcpServers", plugin)
         hooks = json.loads((ROOT / "plugins/dev-lingo/hooks/hooks.json").read_text())
         handler = hooks["hooks"]["UserPromptSubmit"][0]["hooks"][0]
-        self.assertFalse(handler.get("async", False))
+        self.assertTrue(handler.get("async", False))
         self.assertGreater(handler["timeout"], 45)
         self.assertTrue(handler["command"].endswith("hook --host codex"))
 

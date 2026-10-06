@@ -16,7 +16,7 @@ Write a prompt as usual:
 고마워! 이 코드는 기존 동작은 유지하면서 단순하게 바꿔줘. 좋은 하루 보내!
 ```
 
-Dev Lingo displays a hook notification:
+Dev Lingo displays a translation notification:
 
 ```text
 통역: Thanks!
@@ -70,7 +70,7 @@ Enter `/hooks`, review Dev Lingo's `SessionStart` and `UserPromptSubmit` hooks, 
 
 Exit the CLI, completely quit and reopen the Codex desktop app, and start a new local chat. On Windows, confirm that the real `python` interpreter is available to the app as well as PowerShell.
 
-`dev-lingo-local` is the marketplace identifier defined in this repository, including when installed from GitHub. A private repository requires Git access on the installation machine.
+`dev-lingo-local` is the marketplace identifier defined in this repository, including when installed from GitHub.
 
 ### Optional: install and verify with the helper script
 
@@ -100,18 +100,18 @@ Use `python` on Windows. This registers the checkout as a local marketplace. If 
 
 ## Usage
 
-Submit a prompt in a local Codex conversation. The `UserPromptSubmit` hook displays the English rewrite and explanations, then Codex handles your original request. No extra command or learning mode is needed.
+Submit a prompt in a local Codex conversation. The `UserPromptSubmit` hook translates in the background while Codex handles your original request. The rewrite and explanations appear as a notification when Codex can deliver the result. No extra command or learning mode is needed.
 
 On macOS/Linux, when a conversation starts, the `SessionStart` hook prepares one empty translation process in the background. If it is ready when you submit a prompt, Dev Lingo uses it once and closes it, then prepares another empty process. Preparation sends no user prompt and generates no model response. If preparation is unavailable or busy, translation uses a fresh independent run.
 
 - **English output:** prompts in other languages are rewritten in English; English prompts are polished for wording and grammar.
 - **Explanations in your language:** the coach detects the main language of your prose, ignoring code and technical identifiers. Mixed or very short inputs may be detected incorrectly.
 - **Sentence-by-sentence coaching:** explanations follow the final English sentences, which may combine or split your original sentences.
-- **Hook notifications:** output appears in the hook notification, rather than the assistant's answer. Expand the hook entry if it is collapsed.
+- **Background notifications:** output appears as a notification in the conversation. It is delivered at a safe point after the current model request and tool calls finish; if the task has already ended, delivery may wait until your next message.
 
 The English line prefix is currently `통역:` for every input language. Explanation labels follow the detected language, such as `해설:`, `Explanation:`, `解説:`, or `Explicación:`.
 
-To try a rewrite directly:
+From a downloaded source checkout, you can also test a rewrite directly:
 
 ```sh
 python3 plugins/dev-lingo/scripts/dev_lingo.py translate \
@@ -125,14 +125,14 @@ The command returns JSON containing the English sentences and their explanations
 
 | Environment variable | Purpose |
 | --- | --- |
-| `DEV_LINGO_CODEX` | Path to the Codex CLI executable. Otherwise, Dev Lingo searches PATH and common macOS installation locations. |
+| `DEV_LINGO_CODEX` | Path to the Codex CLI executable. Otherwise, Dev Lingo searches PATH and supported installation locations. |
 | `DEV_LINGO_MODEL` | Model to use for the separate translation run. |
 | `DEV_LINGO_COACH_FILE` | Absolute path to a custom coaching instruction file. |
 | `DEV_LINGO_PREWARM` | On macOS/Linux, set to `0` to disable preparation. Windows always uses an independent run, regardless of this variable. |
 
 These variables must reach the app and its hook process. An app that is already running may not receive variables set later in a terminal.
 
-The translation model is independent of the model selected in your working conversation. Both execution paths explicitly use the previously tested `gpt-6.1-sol / low`; `DEV_LINGO_MODEL` can override the model. Prepared translation uses the standard service tier.
+The translation model is independent of the model selected in your working conversation. Both execution paths default to `gpt-6.1-sol / low`; `DEV_LINGO_MODEL` can override the model. Prepared translation uses the standard service tier.
 
 [coach.txt](plugins/dev-lingo/prompts/coach.txt) defines the conversational style and explanation language rules. [output.schema.json](plugins/dev-lingo/prompts/output.schema.json) defines the result format. After changing the bundled instructions, rerun the installer to update the installed copy.
 
@@ -154,10 +154,10 @@ Set `enabled = true` to re-enable it. To disable it for a specific trusted proje
 On macOS/Linux, unused preparation processes stop after two minutes without a translation. To stop an idle preparation worker immediately, run the installed script with `stop`:
 
 ```sh
-python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.2/scripts/dev_lingo.py stop
+python3 ~/.codex/plugins/cache/dev-lingo-local/dev-lingo/0.1.3/scripts/dev_lingo.py stop
 ```
 
-An active translation finishes normally. Disabling or removing the plugin prevents new hook invocations; any unused preparation worker expires on the same idle limit.
+Disabling or removing the plugin prevents new hook invocations. Background translations can continue while the session remains open; Codex cancels them when the session ends. Unused preparation workers expire on the idle limit.
 
 ### Update
 
@@ -198,20 +198,20 @@ Reopen the app to apply the change. Separately downloaded source files and ZIP a
 
 ```mermaid
 flowchart TD
-    S["Conversation starts / previous translation finishes"] --> P["Prepare one empty process"]
+    S["macOS/Linux: conversation starts / previous translation finishes"] --> P["Prepare one empty process"]
     U["Original prompt"] --> H["UserPromptSubmit hook"]
-    H -->|"Original prompt, after hook finishes"| M["Working Codex conversation"]
+    U -->|"Original prompt; no translation wait"| M["Working Codex conversation"]
     M --> W["Original task"]
     P --> T["One-use ephemeral Codex thread"]
     H -->|"Current prompt only"| T
     C["Coaching instructions"] --> T
     T --> V["Validate English sentences and explanations"]
-    V --> N["systemMessage notification"]
+    V --> N["systemMessage warning at the next safe point"]
 ```
 
-The hook runs synchronously, so translation adds a delay before the original task starts. Dev Lingo reads the translation event stream and returns the notification once `turn.completed` confirms completion, without waiting for the CLI's remaining shutdown work.
+The translation hook uses `async: true`, so Codex starts the original task without waiting for translation. Dev Lingo returns its UI-only `systemMessage` after translation completion is confirmed. Codex delivers it at the next safe point after the current model request and tool calls finish. If no turn is active, it waits until the next user turn. Finishing translation does not start a new turn. See [background hook delivery](https://learn.chatgpt.com/docs/hooks#how-background-hooks-run).
 
-On macOS/Linux, preparation follows Pocket Lingo's approach of creating an empty thread before input arrives. A local worker holds one unused Codex process and accepts requests through a Unix socket in a user-private temporary directory. Each process handles at most one translation and is then terminated. The worker expires after two minutes without a translation. First requests and requests without enough preparation time may see little benefit.
+On macOS/Linux, preparation creates an empty thread before input arrives. A local worker holds one unused Codex process and accepts requests through a Unix socket in a user-private temporary directory. Each process handles at most one translation and is then terminated. The worker expires after two minutes without a translation. First requests and requests without enough preparation time may see little benefit.
 
 The preparation worker occupies memory while it is idle. Repeated preparation requests check the worker lock before launching another process. A background waiter reaps every launched worker, and translation cleanup waits for the Codex process and terminates remaining members of its private process group.
 
@@ -223,7 +223,7 @@ Each translation uses an unused process in a new temporary directory. Dev Lingo 
 
 The prepared path uses `codex app-server`, which has no option to ignore the entire user configuration. Dev Lingo explicitly supplies its coaching instructions, clears personal developer instructions, disables project document loading, and turns off hooks, plugins, apps, memories, subagents, shell execution, skill search, web search, personal MCP servers, and notification commands for that process and thread. The independent `codex exec` fallback also ignores user configuration and execution rules. Personal configuration files are not modified. Parent conversation and plugin environment variables are filtered, and a guard prevents recursive translation hooks.
 
-Hook output uses only `systemMessage` for the UI notification. It does not return `additionalContext` or plain text that would become model input. The [context isolation integration test](tests/check_context_isolation.py) captures real Codex CLI and app-server requests to verify this boundary.
+Hook output uses only `systemMessage` for the UI notification. It does not return `additionalContext` or plain text that would become model input. The [context isolation integration test](tests/check_context_isolation.py) captures real Codex CLI and app-server requests to verify this boundary. A delayed translation fixture verifies that the working model request starts before translation finishes, that a warning reaches a safe delivery point, and that current and follow-up model inputs contain no translated text or explanation.
 
 The [prepared translation test](tests/check_prepared_isolation.py) verifies that preparation performs no inference, personal instructions and integrations remain inactive, and one translation's input is absent from the next request.
 
@@ -236,8 +236,9 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 ## Limits and troubleshooting
 
 - Only local Codex on macOS, Linux, and Windows is currently supported. Cloud conversations and other coding agents are outside the current support scope.
-- Each translation consumes Codex usage and delays the original task.
+- Each translation consumes Codex usage. Background execution removes the translation wait before the original task; it does not make the translation itself faster.
 - Independent translation has a 45-second timeout; prepared translation has a 40-second timeout; the hook has a 55-second timeout. On errors, authentication failures, usage limits, or timeouts, the hook skips the notification and lets the original task proceed. Once a prepared run may have received the prompt, Dev Lingo does not retry automatically with another model call.
+- Codex permits up to eight background hooks per session; additional hooks queue. Outputs can arrive in a different order from their inputs. Session end cancels unfinished hooks and discards undelivered output.
 - Empty prompts, prompts longer than 16,000 characters, and hook payloads larger than 64 KiB are skipped.
 
 | Symptom | What to check |
@@ -246,10 +247,10 @@ This applies to Dev Lingo's own translation storage. It does not change storage 
 | Windows / PowerShell installation or hook failure | Confirm `python` works and refresh hook trust. The optional helper can verify installation. Native CLI OS errors need their complete message and number. |
 | Codex executable cannot be found | CLI installation, PATH, or `DEV_LINGO_CODEX`. |
 | No notification after installation | CLI authentication, plugin activation, hook trust, and app restart. |
-| Output seems hidden | Expand the hook entry and confirm you are in a local conversation. |
+| Output seems hidden | Look for a notification starting with `통역:` and confirm you are in a local conversation. Background delivery may wait for the next message. |
 | Only some prompts are skipped | Input size, usage limits, and errors from the direct translation command. |
 | Windows `SessionStart` times out after 5 seconds | Update to 0.1.2 or later, trust the changed hooks with `/hooks`, then completely quit and reopen the app. The Windows start hook now exits without launching Python. |
-| A pause before the task starts | Expected behavior of the synchronous translation hook. |
+| Translation appears late or on the next message | Background output waits for a safe delivery point. Update to 0.1.3 or later if the original task still waits for translation, then refresh hook trust and reopen the app. |
 
 Check installation and authentication:
 
@@ -260,32 +261,27 @@ codex login status
 
 ## Development
 
-Run from the project root:
+From the source checkout, run unit tests and the native hook integration check:
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 tests/check_context_isolation.py
+```
+
+Use `python` on Windows. The integration check requires an installed, trusted Dev Lingo plugin. It uses a delayed translation fixture and a local provider that rejects model requests, with no external inference. It checks that the original request starts before translation finishes, the notification arrives, and translated text stays out of current and follow-up model inputs.
+
+Additional macOS/Linux checks cover prepared-thread isolation and worker lifecycle:
+
+```sh
 python3 tests/check_prepared_isolation.py
 python3 tests/check_lifecycle.py
 ```
 
-The GitHub Actions compatibility workflow runs native Windows (Python 3.9 and 3.12), macOS, and Linux tests, including GitHub installation, hook trust, UI notifications, and context isolation without external inference. Windows tests also check UTF-8 input, blocked pipes, timeouts, and descendant process cleanup. Unix preparation tests run only on macOS/Linux. On Windows, use `python` instead of `python3` for the development commands below.
+The lifecycle check uses local fixtures for 100 requests, including failures, cancellation, and forced termination. Development reports are written under `reports/`; normal plugin use does not create these reports.
 
-Unit tests cover host routing, sentence explanations, result validation, error handling, execution isolation, stream completion, timeouts, and process cleanup. The integration test requires an installed, trusted Dev Lingo plugin. It captures requests through a local provider that deliberately rejects them, without calling an external model. Any test-hook trust bypass applies only to that test run.
+[GitHub Actions](.github/workflows/compatibility.yml) runs native Windows with Python 3.9 and 3.12, macOS, and Linux. It checks installation, upgrades from an older marketplace cache, hook trust, asynchronous delivery, context isolation, and process cleanup without external model calls.
 
-The lifecycle check uses a local Codex fixture and actual worker processes for 100 requests, including failed turns, cancellation, and forced worker termination. It samples worker memory, file descriptors, and process states, and writes `reports/lifecycle-check.json`. It consumes no model inference usage; a finite test cannot rule out every possible leak.
-
-Optional live evaluations consume Codex usage:
-
-```sh
-python3 tests/evaluate_languages.py
-python3 tests/evaluate_latency.py
-python3 tests/evaluate_prewarm.py
-```
-
-The latency evaluation compares waiting for CLI exit with returning on confirmed turn completion. It writes test inputs and results to `reports/latency-evaluation.json`. These saved reports are explicit development evaluations, separate from normal plugin use.
-
-The preparation evaluation alternates independent and prepared runs across eight pairs. Prepared timing starts after setup plus three seconds of simulated typing time and includes local IPC, result validation, and process cleanup. It writes `reports/prewarm-evaluation.json`. It does not represent the latency of a cold request.
+Optional evaluations in `tests/evaluate_languages.py`, `tests/evaluate_latency.py`, and `tests/evaluate_prewarm.py` call the actual model, consume Codex usage, and save test inputs and results under `reports/`. Preparation evaluation requires macOS/Linux; its timings exclude setup and simulated typing time, so they do not represent a cold request.
 
 | File | Responsibility |
 | --- | --- |
@@ -294,6 +290,7 @@ The preparation evaluation alternates independent and prepared runs across eight
 | [codex_provider.py](plugins/dev-lingo/scripts/codex_provider.py) | Isolated Codex execution, timeout, and result collection. |
 | [codex_prepared.py](plugins/dev-lingo/scripts/codex_prepared.py) | Empty ephemeral thread preparation and one-use translation. |
 | [prewarm.py](plugins/dev-lingo/scripts/prewarm.py) | Private local worker, concurrent-request fallback, and idle shutdown. |
+| [lingo_process.py](plugins/dev-lingo/scripts/lingo_process.py) | Executable discovery, Windows hook commands, and process-tree cleanup. |
 | [lingo_core.py](plugins/dev-lingo/scripts/lingo_core.py) | Result validation, sentence formatting, and environment filtering. |
 | [.agents/plugins/marketplace.json](.agents/plugins/marketplace.json) | Marketplace catalog. |
 | [.codex-plugin/plugin.json](plugins/dev-lingo/.codex-plugin/plugin.json) | Plugin metadata. |

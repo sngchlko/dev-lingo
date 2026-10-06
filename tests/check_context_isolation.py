@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Capture the actual Codex model request locally, without an inference call.
 
-Checks the installed CLI runtime, not a mock of our hook function. The local
-provider intentionally rejects inference after capturing each request.
+Checks native sync UI output and the installed asynchronous plugin. The local
+provider delays/rejects inference so no external model is called.
 """
 import json
 import os
@@ -27,11 +27,13 @@ PROMPT = "DEV_LINGO_ORIGINAL_PROMPT_91e042"
 
 def check(app_server=False):
     captured = []
+    request_times = []
     class Capture(BaseHTTPRequestHandler):
         def do_POST(self):
             raw = self.rfile.read(int(self.headers["Content-Length"]))
             captured.append(json.loads(raw))
-            time.sleep(1)
+            request_times.append(time.time())
+            time.sleep(3 if app_server and len(captured) == 1 else 0.2)
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -69,14 +71,14 @@ def check(app_server=False):
                 fake_result = {"explanation_label": "解説", "sentences": [
                     {"english": SENTINEL, "explanation": EXPLANATION_SENTINEL},
                     {"english": "Thanks!", "explanation": ""}]}
-                fake_codex.write_text("#!" + sys.executable + "\nimport json,sys\nfrom pathlib import Path\nsys.stdin.read()\nPath(%r).write_text('executed')\nprint(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps(%r)}}),flush=True)\nprint(json.dumps({'type':'turn.completed'}),flush=True)\n" % (str(marker), fake_result))
+                fake_codex.write_text("#!" + sys.executable + "\nimport json,sys,time\nfrom pathlib import Path\nsys.stdin.read()\ntime.sleep(2)\nPath(%r).write_text('executed')\nprint(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps(%r)}}),flush=True)\nprint(json.dumps({'type':'turn.completed'}),flush=True)\n" % (str(marker), fake_result))
                 fake_codex.chmod(0o700)
                 if os.name == "nt":
                     fake_codex = root / "fake-codex.exe"
                     compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
                     source = root / "fixture.cs"
                     message = json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": json.dumps(fake_result, ensure_ascii=False)}}, ensure_ascii=False)
-                    source.write_text('using System;using System.IO;using System.Text;class Fixture{static void Main(){Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);Console.In.ReadToEnd();File.WriteAllText(%s,"executed");Console.WriteLine(%s);Console.WriteLine("{\\\"type\\\":\\\"turn.completed\\\"}");}}' % (json.dumps(str(marker)), json.dumps(message)), encoding="utf-8")
+                    source.write_text('using System;using System.IO;using System.Text;using System.Threading;class Fixture{static void Main(){Console.InputEncoding=new UTF8Encoding(false);Console.OutputEncoding=new UTF8Encoding(false);Console.In.ReadToEnd();Thread.Sleep(2000);File.WriteAllText(%s,"executed");Console.WriteLine(%s);Console.WriteLine("{\\\"type\\\":\\\"turn.completed\\\"}");}}' % (json.dumps(str(marker)), json.dumps(message)), encoding="utf-8")
                     subprocess.run([str(compiler), "/nologo", "/out:" + str(fake_codex), str(source)], check=True, capture_output=True)
                 env = dict(os.environ, DEV_LINGO_CODEX=str(fake_codex), DEV_LINGO_PREWARM="0")
                 client = Client([find_codex(), "app-server"] + options, env=env)
@@ -84,6 +86,8 @@ def check(app_server=False):
                     listed = client.call("hooks/list", {"cwds": [str(root)]})
                     fixture_hooks = [hook for entry in listed["data"] for hook in entry["hooks"] if hook.get("pluginId") == "dev-lingo@dev-lingo-local"]
                     assert len(fixture_hooks) == 2 and all(h["trustStatus"] == "trusted" for h in fixture_hooks), "Install and trust Dev Lingo before the app-server integration check"
+                    definition = json.loads(Path(fixture_hooks[0]["sourcePath"]).read_text(encoding="utf-8"))
+                    assert definition["hooks"]["UserPromptSubmit"][0]["hooks"][0].get("async") is True, "Expected an installed background translation hook"
                     thread_config = {"features.hooks": True, "features.plugins": True, "project_doc_max_bytes": 0}
                     thread = client.call("thread/start", {"cwd": str(root), "ephemeral": True, "config": thread_config,
                         "baseInstructions": "Test model context isolation only.", "developerInstructions": "",
@@ -94,16 +98,35 @@ def check(app_server=False):
                         client.notifications.append(notification)
                         if notification.get("method") == "turn/completed":
                             break
+                    deadline = time.monotonic() + 10
+                    while not marker.exists():
+                        assert time.monotonic() < deadline, "Background translation did not finish"
+                        time.sleep(.05)
+                    assert request_times[0] < marker.stat().st_mtime, "Working model waited for translation completion"
+                    # An idle turn may defer informational output. A follow-up
+                    # provides a safe delivery point without any context injection.
+                    time.sleep(.2)
+                    client.call("turn/start", {"threadId": thread["id"], "input": [{"type": "text", "text": "DEV_LINGO_FOLLOWUP_PROBE"}]})
+                    while True:
+                        notification = client.messages.get(timeout=20)
+                        client.notifications.append(notification)
+                        if notification.get("method") == "turn/completed":
+                            break
                     ui_seen = SENTINEL in json.dumps(client.notifications)
                     assert EXPLANATION_SENTINEL in json.dumps(client.notifications, ensure_ascii=False), "Localized explanation missing from UI notification"
                     assert marker.exists(), "App-server hook did not execute: " + json.dumps([n for n in client.notifications if n.get("method") == "warning"])
                     assert ui_seen, "Translation UI notification missing: " + json.dumps([n for n in client.notifications if "hook" in str(n.get("method", "")) or "warning" in str(n.get("method", ""))])
-                    ui_entries = [entry for event in client.notifications
-                                  for entry in event.get("params", {}).get("run", {}).get("entries", [])
-                                  if SENTINEL in entry.get("text", "")]
-                    assert ui_entries and all(entry["kind"] == "warning" for entry in ui_entries), "Translation is not a UI-only warning entry"
                     expected_message = "통역: " + SENTINEL + "\n解説: " + EXPLANATION_SENTINEL + "\n통역: Thanks!"
-                    assert any(entry["text"] == expected_message for entry in ui_entries), "Sentence explanations are not paired in translation order"
+                    def has_text(value):
+                        if isinstance(value, str):
+                            return value == expected_message
+                        if isinstance(value, dict):
+                            return any(has_text(item) for item in value.values())
+                        if isinstance(value, list):
+                            return any(has_text(item) for item in value)
+                        return False
+                    warnings = [event for event in client.notifications if event.get("method") == "warning"]
+                    assert any(has_text(event.get("params")) for event in warnings), "Paired translation was not delivered as a UI-only warning: " + json.dumps(warnings, ensure_ascii=False)
                     result = subprocess.CompletedProcess([], 0, "", "")
                 finally:
                     client.close()
@@ -121,6 +144,7 @@ def check(app_server=False):
             print(json.dumps({"surface": "app-server" if app_server else "exec", "hook_executed": True,
                               "model_requests_captured": len(captured), "original_prompt_present": True,
                               "ui_translation_absent_from_model_input": True,
+                              "working_request_before_translation_finished": True if app_server else None,
                               "native_ui_notification_present": ui_seen if app_server else None}))
     finally:
         server.shutdown()
